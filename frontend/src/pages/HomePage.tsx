@@ -29,10 +29,11 @@ export function HomePage() {
 
   return (
     <section className="card">
-      <h1>Phase 3 authentication</h1>
+      <h1>Phase 4 dashboard</h1>
       <p>
         GNK Algo is running in <strong>PAPER</strong> mode by default. Live trading is not enabled.
-        Register and login use <code>/api/v1/auth</code> and an HttpOnly cookie — never a broker API.
+        <a href="/login">Login</a> to open the protected dashboard — mock-labeled capital, order book ticks, and AI
+        signal table shell.
       </p>
       <dl className="status-grid">
         <div>

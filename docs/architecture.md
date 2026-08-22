@@ -2,11 +2,11 @@
 
 **Product:** GNK Algo  
 **Scope:** NSE Equity, NSE Futures, NSE Options  
-**Current implementation phase:** 3 (auth start: sessions, HttpOnly cookie, lockout; dashboard/brokers later)  
+**Current implementation phase:** 4 (protected dashboard shell; brokers in Phase 5–6)  
 **Primary development:** VS Code on Windows 11  
 **Deployment target:** Ubuntu 24.04 + Docker  
 
-This document is the architectural source of truth for Phases 0–6 and the extension points for Phases 7–14. Phase 3 implements authentication, HttpOnly sessions, login lockout, audit events, and secret encryption helpers.
+This document is the architectural source of truth for Phases 0–6 and the extension points for Phases 7–14. Phase 4 implements the protected dashboard UI and `GET /api/v1/dashboard` mock snapshot.
 
 ---
 

@@ -54,4 +54,4 @@ Password: min 12 chars, upper, lower, digit, symbol. Mobile: Indian 10-digit.
 
 ## NEXT PHASE
 
-**PHASE 4 — Dashboard** (logo, order book, tick sounds, protected shell using `/auth/me`).
+**PHASE 4 — Dashboard** — see [phase-4.md](phase-4.md).

@@ -11,6 +11,7 @@ vi.mock("./services/api", () => ({
     checks: { database: "ok", redis: "ok" },
     trading_mode: "PAPER",
   })),
+  getMe: vi.fn(async () => Promise.reject(new Error("unauthenticated"))),
 }));
 
 describe("App", () => {
@@ -20,7 +21,7 @@ describe("App", () => {
         <App />
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/Phase 3 authentication/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Phase 4 dashboard/i)).toBeInTheDocument();
     expect(await screen.findByTestId("health-status")).toHaveTextContent("ok");
   });
 });

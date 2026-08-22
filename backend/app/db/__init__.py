@@ -1,1 +1,1 @@
-"""Database package. Schema migrations belong to Alembic (Phase 2)."""
+"""Database package. Schema changes go through Alembic only — never metadata.create_all() in production."""

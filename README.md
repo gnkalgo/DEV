@@ -2,7 +2,7 @@
 
 Production-oriented algorithmic trading platform for **NSE Equity**, **NSE Futures**, and **NSE Options**.
 
-**Current status: Phase 1 complete** (runnable foundation). Authentication, database tables, dashboard trading widgets, and brokers start in later phases.
+**Current status: Phase 2 complete** (schema + Redis keys). Authentication, dashboard trading widgets, and brokers start in later phases.
 
 | Item | Value |
 | --- | --- |
@@ -25,6 +25,7 @@ The browser never calls a broker API, never accesses the database, and never rec
 - [docs/architecture.md](docs/architecture.md)
 - [docs/phase-0.md](docs/phase-0.md)
 - [docs/phase-1.md](docs/phase-1.md)
+- [docs/phase-2.md](docs/phase-2.md)
 
 ## Phases
 
@@ -32,7 +33,7 @@ The browser never calls a broker API, never accesses the database, and never rec
 | --- | --- |
 | 0 Product definition + architecture | Done |
 | 1 Project foundation | Done |
-| 2 PostgreSQL + TimescaleDB + Redis | Not started |
+| 2 PostgreSQL + TimescaleDB + Redis | Done |
 | 3 Authentication + security | Not started |
 | 4 Dashboard (logo, order book, tick sounds) | Not started |
 | 5 Broker manager + mock broker | Not started |
@@ -96,10 +97,10 @@ Do not publish PostgreSQL or Redis on a public interface in production.
 
 ## Database migrations
 
-Phase 1 ships a no-op Alembic baseline. Application tables arrive in Phase 2.
+Phase 2 applies OLTP tables and Timescale hypertables.
 
-```bash
-docker compose run --rm --no-deps --entrypoint alembic backend upgrade head
+```powershell
+docker compose run --rm --entrypoint alembic backend upgrade head
 ```
 
 ## Testing

@@ -1,3 +1,3 @@
 TimescaleDB is enabled by the `timescale/timescaledb` image.
 
-Application tables are created with Alembic in Phase 2. Do not publish this service to the public internet in production.
+Alembic Phase 2 creates OLTP tables and hypertables (`0002_phase2_oltp`, `0003_phase2_timescale`). Do not publish this service to the public internet in production.

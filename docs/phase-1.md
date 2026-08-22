@@ -32,7 +32,7 @@ Backend application factory, settings, health router, async SQLAlchemy engine, R
 
 ## DATABASE CHANGES
 
-Alembic revision `0001_phase1_baseline` is a no-op. **No application tables.** TimescaleDB is available because Compose uses `timescale/timescaledb:latest-pg16`. Hypertables and OLTP tables arrive in Phase 2.
+Alembic revision `0001_phase1_baseline` is a no-op. **No application tables in Phase 1.** TimescaleDB is available because Compose uses `timescale/timescaledb:latest-pg16`. Hypertables and OLTP tables are Phase 2 (`docs/phase-2.md`).
 
 ## API ENDPOINTS
 

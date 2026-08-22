@@ -7,3 +7,4 @@ if [[ ! -f .env ]]; then
   echo "Created .env from .env.example — change CHANGE_ME secrets before production."
 fi
 docker compose up -d --build
+docker compose run --rm --entrypoint alembic backend upgrade head

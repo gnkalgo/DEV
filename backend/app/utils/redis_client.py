@@ -1,4 +1,7 @@
-"""Redis client. Do not store plaintext secrets in Redis."""
+"""Redis client. Do not store plaintext secrets in Redis.
+
+Key names live in app.utils.redis_keys. Access tokens and TOTP stay in PostgreSQL (broker_tokens).
+"""
 
 from redis.asyncio import Redis
 

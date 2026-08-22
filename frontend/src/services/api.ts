@@ -84,3 +84,8 @@ export async function getMe(): Promise<AuthResponse> {
   const { data } = await api.get<AuthResponse>("/auth/me");
   return data;
 }
+
+export async function getDashboard(): Promise<import("../types/dashboard").DashboardResponse> {
+  const { data } = await api.get<import("../types/dashboard").DashboardResponse>("/dashboard");
+  return data;
+}

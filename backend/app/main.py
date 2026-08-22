@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import auth as auth_router
+from app.api.v1 import dashboard as dashboard_router
 from app.api.v1 import health as health_router
 from app.core.config import Settings, get_settings
 from app.core.exceptions import register_exception_handlers
@@ -66,6 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router.router)
     app.include_router(health_router.router, prefix="/api/v1")
     app.include_router(auth_router.router, prefix="/api/v1")
+    app.include_router(dashboard_router.router, prefix="/api/v1")
     return app
 
 

@@ -6,6 +6,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.core.errors import AuthError
+
 
 def error_body(code: str, message: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
     payload: dict[str, Any] = {"success": False, "error": {"code": code, "message": message}}
@@ -15,6 +17,13 @@ def error_body(code: str, message: str, extra: dict[str, Any] | None = None) -> 
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(AuthError)
+    async def auth_error_handler(_request: Request, exc: AuthError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=error_body(exc.code, exc.message),
+        )
+
     @app.exception_handler(HTTPException)
     async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
         code = "HTTP_ERROR"

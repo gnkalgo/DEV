@@ -38,6 +38,11 @@ class Settings(BaseSettings):
         alias="CORS_ORIGINS",
     )
 
+    session_ttl_seconds: int = Field(default=43200, alias="SESSION_TTL_SECONDS")
+    login_max_failures: int = Field(default=5, alias="LOGIN_MAX_FAILURES")
+    login_lockout_seconds: int = Field(default=900, alias="LOGIN_LOCKOUT_SECONDS")
+    session_cookie_name: str = Field(default="gnkalgo_session", alias="SESSION_COOKIE_NAME")
+
     broker_api_ip: str = Field(default="", alias="BROKER_API_IP")
     server_public_ip: str = Field(default="", alias="SERVER_PUBLIC_IP")
 
@@ -55,6 +60,14 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
+
+    @property
+    def is_test(self) -> bool:
+        return self.app_env.lower() in {"test", "testing"}
+
+    @property
+    def login_delay_step_seconds(self) -> float:
+        return 0.0 if self.is_test else 0.25
 
     def assert_safe_for_production(self) -> None:
         """Refuse to start in production with placeholder secrets or LIVE-by-accident defaults."""

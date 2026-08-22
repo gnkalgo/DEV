@@ -137,6 +137,6 @@ Tests do not place live orders and do not use broker credentials.
 
 ## NEXT PHASE
 
-**PHASE 3 — Authentication + security**
+**PHASE 4 — Dashboard**
 
-Register/login/logout/`/me`, password hashing, HttpOnly sessions, rate limit/lockout, audit on auth events, encryption helpers.
+Logo, order book, tick/cancel audio, protected app shell using `/api/v1/auth/me`.

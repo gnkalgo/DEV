@@ -2,7 +2,7 @@
 
 Production-oriented algorithmic trading platform for **NSE Equity**, **NSE Futures**, and **NSE Options**.
 
-**Current status: Phase 2 complete** (schema + Redis keys). Authentication, dashboard trading widgets, and brokers start in later phases.
+**Current status: Phase 3 start** (register/login sessions). Dashboard trading widgets and brokers start in later phases.
 
 | Item | Value |
 | --- | --- |
@@ -26,6 +26,8 @@ The browser never calls a broker API, never accesses the database, and never rec
 - [docs/phase-0.md](docs/phase-0.md)
 - [docs/phase-1.md](docs/phase-1.md)
 - [docs/phase-2.md](docs/phase-2.md)
+- [docs/phase-3.md](docs/phase-3.md)
+- [docs/security.md](docs/security.md)
 
 ## Phases
 
@@ -34,7 +36,7 @@ The browser never calls a broker API, never accesses the database, and never rec
 | 0 Product definition + architecture | Done |
 | 1 Project foundation | Done |
 | 2 PostgreSQL + TimescaleDB + Redis | Done |
-| 3 Authentication + security | Not started |
+| 3 Authentication + security | Done (start: register/login/logout/me) |
 | 4 Dashboard (logo, order book, tick sounds) | Not started |
 | 5 Broker manager + mock broker | Not started |
 | 6 DhanHQ adapter (one real broker) | Not started |

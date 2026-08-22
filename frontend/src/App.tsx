@@ -1,14 +1,16 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "./layouts/AppLayout";
 import { HomePage } from "./pages/HomePage";
+import { LoginPage } from "./pages/LoginPage";
+import { RegisterPage } from "./pages/RegisterPage";
 
 export default function App() {
   return (
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<Placeholder title="Login" phase="Phase 3" />} />
-        <Route path="/register" element={<Placeholder title="Register" phase="Phase 3" />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route path="/dashboard" element={<Placeholder title="Dashboard" phase="Phase 4" />} />
         <Route path="/broker" element={<Placeholder title="Broker" phase="Phase 4–6" />} />
         <Route path="/orders" element={<Placeholder title="Orders" phase="Phase 4–6" />} />

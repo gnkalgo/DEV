@@ -20,7 +20,7 @@ describe("App", () => {
         <App />
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/Phase 1 foundation/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Phase 3 authentication/i)).toBeInTheDocument();
     expect(await screen.findByTestId("health-status")).toHaveTextContent("ok");
   });
 });

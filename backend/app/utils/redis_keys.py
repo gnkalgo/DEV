@@ -40,6 +40,14 @@ def rate_limit_key(user_id: IdLike) -> str:
     return f"rate-limit:{_part(user_id, field='user_id')}"
 
 
+def login_rate_limit_key(email: str) -> str:
+    return f"rate-limit:login:{_part(email.lower(), field='email')}"
+
+
+def login_lockout_key(email: str) -> str:
+    return f"lockout:login:{_part(email.lower(), field='email')}"
+
+
 def ws_presence_key(user_id: IdLike) -> str:
     return f"ws:presence:{_part(user_id, field='user_id')}"
 

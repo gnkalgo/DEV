@@ -2,11 +2,11 @@
 
 **Product:** GNK Algo  
 **Scope:** NSE Equity, NSE Futures, NSE Options  
-**Current implementation phase:** 2 (OLTP schema, Timescale hypertables, Redis key helpers; auth/brokers still later)  
+**Current implementation phase:** 3 (auth start: sessions, HttpOnly cookie, lockout; dashboard/brokers later)  
 **Primary development:** VS Code on Windows 11  
 **Deployment target:** Ubuntu 24.04 + Docker  
 
-This document is the architectural source of truth for Phases 0–6 and the extension points for Phases 7–14. Phase 2 implements application tables, future hypertables, and Redis key namespaces.
+This document is the architectural source of truth for Phases 0–6 and the extension points for Phases 7–14. Phase 3 implements authentication, HttpOnly sessions, login lockout, audit events, and secret encryption helpers.
 
 ---
 

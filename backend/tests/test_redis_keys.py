@@ -9,6 +9,8 @@ from app.utils.redis_keys import (
     broker_session_key,
     broker_status_key,
     latest_ltp_key,
+    login_lockout_key,
+    login_rate_limit_key,
     order_idempotency_key,
     rate_limit_key,
     signal_lock_key,
@@ -25,6 +27,8 @@ def test_architecture_key_shapes() -> None:
     assert signal_lock_key("NIFTY") == "signal:lock:NIFTY"
     assert order_idempotency_key("abc-1") == "order:idempotency:abc-1"
     assert rate_limit_key(user_id) == f"rate-limit:{user_id}"
+    assert login_rate_limit_key("A@B.com") == "rate-limit:login:a@b.com"
+    assert login_lockout_key("A@B.com") == "lockout:login:a@b.com"
     assert ws_presence_key(user_id) == f"ws:presence:{user_id}"
 
 

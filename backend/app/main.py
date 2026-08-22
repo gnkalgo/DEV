@@ -8,8 +8,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import auth as auth_router
+from app.api.v1 import brokers as brokers_router
 from app.api.v1 import dashboard as dashboard_router
 from app.api.v1 import health as health_router
+from app.api.v1 import orders as orders_router
+from app.api.v1 import portfolio as portfolio_router
+from app.api.v1 import positions as positions_router
 from app.core.config import Settings, get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import RequestIdFilter, configure_logging
@@ -68,6 +72,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router.router, prefix="/api/v1")
     app.include_router(auth_router.router, prefix="/api/v1")
     app.include_router(dashboard_router.router, prefix="/api/v1")
+    app.include_router(brokers_router.router, prefix="/api/v1")
+    app.include_router(orders_router.router, prefix="/api/v1")
+    app.include_router(positions_router.router, prefix="/api/v1")
+    app.include_router(portfolio_router.router, prefix="/api/v1")
     return app
 
 

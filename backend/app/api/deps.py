@@ -11,6 +11,8 @@ from app.core.config import Settings
 from app.db.database import SessionLocal
 from app.db.models import User
 from app.services.auth import AuthService
+from app.services.broker import BrokerService
+from app.services.order import OrderService
 from app.utils.redis_client import redis_client
 
 
@@ -50,6 +52,28 @@ def _session_cookie(request: Request) -> str | None:
     if token:
         return str(token)
     return request.cookies.get(settings.session_cookie_name)
+
+
+async def get_broker_service(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    redis: Annotated[Redis, Depends(get_redis)],
+) -> BrokerService:
+    return BrokerService(session=session, settings=settings, redis=redis)
+
+
+async def get_order_service(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    broker_service: Annotated[BrokerService, Depends(get_broker_service)],
+) -> OrderService:
+    return OrderService(
+        session=session,
+        settings=settings,
+        redis=redis,
+        broker_service=broker_service,
+    )
 
 
 async def get_current_user(

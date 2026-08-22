@@ -5,7 +5,7 @@ export function BrokerPage() {
     <section className="card">
       <h1>Broker</h1>
       <p className="muted">
-        Secrets stay in the form until Phase 5 persist/connect. Existing secrets would display as ************ only.
+        Save Mock or Dhan credentials (encrypted server-side). Secrets display as ************ when already stored.
       </p>
       <BrokerForm />
     </section>

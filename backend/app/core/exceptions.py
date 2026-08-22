@@ -6,7 +6,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.core.errors import AuthError
+from app.brokers.exceptions import BrokerError
+from app.core.errors import AppError, AuthError
 
 
 def error_body(code: str, message: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -17,12 +18,21 @@ def error_body(code: str, message: str, extra: dict[str, Any] | None = None) -> 
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    @app.exception_handler(AuthError)
-    async def auth_error_handler(_request: Request, exc: AuthError) -> JSONResponse:
+    @app.exception_handler(AppError)
+    async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status_code,
             content=error_body(exc.code, exc.message),
         )
+
+    @app.exception_handler(BrokerError)
+    async def broker_error_handler(_request: Request, exc: BrokerError) -> JSONResponse:
+        status = 400
+        if exc.code == "UNSUPPORTED_OPERATION":
+            status = 501
+        elif exc.code in {"BROKER_AUTH_FAILED", "BROKER_API_ERROR"}:
+            status = 502
+        return JSONResponse(status_code=status, content=error_body(exc.code, exc.message))
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:

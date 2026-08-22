@@ -3,8 +3,10 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_app_settings, get_current_user
+from app.api.deps import get_app_settings, get_current_user, get_db_session, get_redis
 from app.core.config import Settings
 from app.db.models import User
 from app.schemas.dashboard import DashboardResponse
@@ -15,7 +17,9 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 @router.get("", response_model=DashboardResponse)
 async def get_dashboard(
-    _user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(get_current_user)],
     settings: Annotated[Settings, Depends(get_app_settings)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> DashboardResponse:
-    return DashboardService(settings).build()
+    return await DashboardService(settings, session, redis).build(user.id)

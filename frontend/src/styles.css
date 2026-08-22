@@ -1,0 +1,98 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b1220;
+  --card: #141c2e;
+  --text: #e8eefc;
+  --muted: #9aabc9;
+  --accent: #3d8bfd;
+  --border: #243049;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top, #152445, var(--bg) 45%);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(11, 18, 32, 0.9);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.logo {
+  width: 36px;
+  height: 36px;
+}
+
+.topbar nav {
+  display: flex;
+  gap: 1rem;
+}
+
+main {
+  padding: 1.5rem;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+dd {
+  margin: 0.35rem 0 0;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+}

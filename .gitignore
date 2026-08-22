@@ -1,0 +1,64 @@
+# Secrets and local env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Credentials
+*.pem
+*.key
+*.p12
+*.pfx
+credentials
+credentials.*
+secrets
+secrets.*
+*token*
+!*token*.md
+password
+passwords
+*.secret
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+yarn-error.log*
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-data/
+
+# Alembic local
+*.db
+
+# Logs
+logs/
+*.log

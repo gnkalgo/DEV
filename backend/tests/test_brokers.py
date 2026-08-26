@@ -79,7 +79,9 @@ def test_list_brokers(client: TestClient) -> None:
     response = client.get("/api/v1/brokers")
     assert response.status_code == 200
     assert response.json()["brokers"][0]["broker"] == "MOCK"
-    assert "api_key" not in response.text
+    broker = response.json()["brokers"][0]
+    assert "api_key" not in broker
+    assert "api_secret" not in broker
 
 
 def test_save_broker(client: TestClient) -> None:

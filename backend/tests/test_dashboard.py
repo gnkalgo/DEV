@@ -22,6 +22,9 @@ from tests.test_auth import StubAuthService, _settings
 
 
 class _StubDashboardService:
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        pass
+
     async def build(self, user_id):
         return DashboardResponse(
             trading_mode="PAPER",

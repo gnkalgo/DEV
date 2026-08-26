@@ -7,19 +7,22 @@ from fastapi import Depends, Request
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import importlib
+
 from app.core.config import Settings
-from app.db.database import SessionLocal
+from app.db import database
 from app.db.models import User
 from app.services.auth import AuthService
 from app.services.broker import BrokerService
 from app.services.order import OrderService
-from app.utils.redis_client import redis_client
+
+redis_module = importlib.import_module("app.utils.redis_client")
 
 
 async def get_db_session() -> AsyncIterator[AsyncSession]:
-    if SessionLocal is None:
+    if database.SessionLocal is None:
         raise RuntimeError("Database session factory is not initialized")
-    async with SessionLocal() as session:
+    async with database.SessionLocal() as session:
         try:
             yield session
             await session.commit()
@@ -33,9 +36,9 @@ def get_app_settings(request: Request) -> Settings:
 
 
 def get_redis() -> Redis:
-    if redis_client is None:
+    if redis_module.redis_client is None:
         raise RuntimeError("Redis client is not initialized")
-    return redis_client
+    return redis_module.redis_client
 
 
 async def get_auth_service(

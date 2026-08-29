@@ -1,72 +1,109 @@
-"""Auth request/response schemas. Password hashes never leave the service layer."""
-
-from __future__ import annotations
-
-import uuid
+import re
 from datetime import datetime
+from typing import Literal
+from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
-
-from app.utils.validators import (
-    PasswordPolicyError,
-    validate_mobile,
-    validate_password_strength,
-)
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class RegisterRequest(BaseModel):
-    full_name: str = Field(min_length=2, max_length=200)
     email: EmailStr
-    mobile: str
-    password: str
-    confirm_password: str
-
-    @field_validator("full_name")
-    @classmethod
-    def strip_name(cls, value: str) -> str:
-        name = value.strip()
-        if len(name) < 2:
-            raise ValueError("Full name is required")
-        return name
-
-    @field_validator("mobile")
-    @classmethod
-    def check_mobile(cls, value: str) -> str:
-        return validate_mobile(value)
+    password: str = Field(min_length=12, max_length=128)
+    full_name: str = Field(min_length=2, max_length=100)
+    phone: str | None = Field(default=None, max_length=15)
 
     @field_validator("password")
     @classmethod
-    def check_password(cls, value: str) -> str:
-        try:
-            validate_password_strength(value)
-        except PasswordPolicyError as exc:
-            raise ValueError(str(exc)) from exc
-        return value
+    def validate_password(cls, v: str) -> str:
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit")
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
+            raise ValueError("Password must contain at least one special character")
+        return v
 
-    @model_validator(mode="after")
-    def passwords_match(self) -> RegisterRequest:
-        if self.password != self.confirm_password:
-            raise ValueError("Password and confirm_password must match")
-        return self
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str | None) -> str | None:
+        if v and not re.match(r"^\+?[6-9]\d{9}$", v.replace(" ", "")):
+            raise ValueError("Invalid Indian phone number")
+        return v
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=1)
+    password: str
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=6)
 
 
-class UserPublic(BaseModel):
-    id: uuid.UUID
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=12, max_length=128)
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class MFASetupResponse(BaseModel):
+    secret: str
+    qr_uri: str
+    backup_codes: list[str]
+
+
+class MFAVerifyRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=6)
+
+
+class UserResponse(BaseModel):
+    id: UUID
     email: str
-    mobile: str
-    full_name: str
-    is_active: bool
+    full_name: str | None
+    phone: str | None
     is_verified: bool
-    created_at: datetime | None = None
+    mfa_enabled: bool
+    is_admin: bool = False
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 
 
-class AuthResponse(BaseModel):
-    success: bool = True
-    user: UserPublic
+class MessageResponse(BaseModel):
+    message: str
+
+
+class BrokerConnectRequest(BaseModel):
+    broker: Literal["dhan", "groww"]
+    api_key: str | None = None
+    api_secret: str | None = None
+    access_token: str | None = None
+    client_id: str | None = None
+
+
+class BrokerConnectionResponse(BaseModel):
+    id: UUID
+    broker: str
+    is_active: bool
+    health_status: str
+    client_id: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

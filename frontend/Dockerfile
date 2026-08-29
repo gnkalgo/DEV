@@ -1,14 +1,20 @@
-FROM node:20-alpine AS build
+FROM node:20-alpine
+
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
 COPY . .
+
+ARG NEXT_PUBLIC_API_URL=
+ARG BACKEND_INTERNAL_URL=http://backend:8000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV BACKEND_INTERNAL_URL=$BACKEND_INTERNAL_URL
+ENV NEXT_TELEMETRY_DISABLED=1
+
 RUN npm run build
 
-FROM nginx:1.27-alpine
-RUN apk add --no-cache curl
-COPY nginx.frontend.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
-HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
-    CMD curl -fsS http://127.0.0.1/ >/dev/null || exit 1
+EXPOSE 3000
+
+CMD ["npm", "run", "start", "--", "--hostname", "0.0.0.0", "--port", "3000"]

@@ -1,64 +1,25 @@
-# Secrets and local env
 .env
-.env.local
-.env.*.local
-!.env.example
-
-# Credentials
-*.pem
-*.key
-*.p12
-*.pfx
-credentials
-credentials.*
-secrets
-secrets.*
-*token*
-!*token*.md
-password
-passwords
-*.secret
-
-# Python
+.venv
+venv
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-.venv/
-venv/
-env/
+*.egg-info/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.coverage
-htmlcov/
-*.egg-info/
-dist/
-build/
-
-# Node
-node_modules/
-frontend/dist/
-frontend/.vite/
-npm-debug.log*
-yarn-error.log*
-
-# IDEs
+*.db
+*.sqlite3
+backend/models/registry/
+ml-service/models/registry/
 .idea/
 .vscode/
-*.swp
-
-# OS
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+dist/
 .DS_Store
-Thumbs.db
-
-# Docker
-docker-data/
-
-# Alembic local
-*.db
-
-# Logs
-logs/
 *.log
+agent-tools/
+
+artifacts/

@@ -1,151 +1,88 @@
-# GNK Algo
+# GnKAlgo
 
-Production-oriented algorithmic trading platform for **NSE Equity**, **NSE Futures**, and **NSE Options**.
+Indian algo trading platform for **www.gnkalgo.com**.
 
-**Current status: Phase 6 complete** (Mock broker + paper orders; DhanHQ v2 adapter for LIVE when enabled).
+Stack: **FastAPI** (backend) + **Python ML service** + **Next.js** (frontend) + PostgreSQL/SQLite + Redis.
 
-| Item | Value |
-| --- | --- |
-| Product | GNK Algo |
-| Development | VS Code on Windows 11 |
-| Deployment | Ubuntu 24.04 + Docker |
-| Default trading mode | `PAPER` (LIVE is never the default) |
-| Phase 6 broker | DhanHQ API v2 (official docs only) |
+Brokers: **DhanHQ** and **Groww**.
 
-## Architecture
-
-```
-Internet → Cloudflare → Nginx → React / FastAPI → Services
-    → PostgreSQL + TimescaleDB / Redis
-    → BrokerManager → Mock broker or Dhan adapter
-```
-
-The browser never calls a broker API, never accesses the database, and never receives broker secrets.
-
-- [docs/architecture.md](docs/architecture.md)
-- [docs/phase-0.md](docs/phase-0.md)
-- [docs/phase-1.md](docs/phase-1.md)
-- [docs/phase-2.md](docs/phase-2.md)
-- [docs/phase-3.md](docs/phase-3.md)
-- [docs/phase-4.md](docs/phase-4.md)
-- [docs/phase-5.md](docs/phase-5.md)
-- [docs/phase-6.md](docs/phase-6.md)
-- [docs/security.md](docs/security.md)
-
-## Phases
-
-| Phase | Status |
-| --- | --- |
-| 0 Product definition + architecture | Done |
-| 1 Project foundation | Done |
-| 2 PostgreSQL + TimescaleDB + Redis | Done |
-| 3 Authentication + security | Done (start: register/login/logout/me) |
-| 4 Dashboard (logo, order book, tick sounds) | Done |
-| 5 Broker manager + mock broker | Done |
-| 6 DhanHQ adapter (one real broker) | Done |
-| 7–14 Market data, ML, signals, risk, live E2E | Extension points only |
-
-## Prerequisites
-
-- Git
-- Docker Desktop (Windows) or Docker Engine (Ubuntu 24.04)
-- Optional for local (non-Docker) API/UI: Python 3.11+, Node.js 20+
-
-## Windows (VS Code)
-
-```powershell
-cd C:\GNK_IDE
-Copy-Item .env.example .env
-.\scripts\start.ps1
-```
-
-Open http://localhost/
-
-Stop:
-
-```powershell
-.\scripts\stop.ps1
-```
-
-Health:
-
-```powershell
-curl http://localhost/health
-curl http://localhost/api/v1/ready
-```
-
-## Ubuntu 24.04
+## Local development
 
 ```bash
-sudo apt update
-sudo apt install -y git docker.io docker-compose-v2
-git clone <your-repo-url> gnkalgo
-cd gnkalgo
-cp .env.example .env
-chmod +x scripts/*.sh
-./scripts/start.sh
-```
-
-Open http://localhost/
-
-## Docker Compose
-
-```bash
-docker compose up -d --build
-docker compose logs -f
-docker compose down
-```
-
-Services: `nginx` (port 80), `frontend`, `backend`, `postgres` (TimescaleDB, `127.0.0.1:5432`), `redis` (`127.0.0.1:6379`).
-
-Do not publish PostgreSQL or Redis on a public interface in production.
-
-## Database migrations
-
-Phase 2 applies OLTP tables and Timescale hypertables.
-
-```powershell
-docker compose run --rm --entrypoint alembic backend upgrade head
-```
-
-## Testing
-
-```powershell
+# 1. Backend
 cd backend
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+source .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest
+uvicorn app.main:app --reload --port 8000
 
-cd ..\frontend
+# 2. ML service (optional for AI signals)
+cd ml-service
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8001
+
+# 3. Frontend
+cd frontend
 npm install
-npm test
+npm run dev
 ```
 
-Tests never place live orders and never use real broker credentials.
+Open http://localhost:3000
 
-## Environment variables
+API docs: http://localhost:8000/docs
 
-Copy [.env.example](.env.example) to `.env`. Never commit `.env`.
+## Docker
 
-Required placeholders to replace before production: `JWT_SECRET`, `ENCRYPTION_KEY`, `POSTGRES_PASSWORD`. Keep `TRADING_MODE=PAPER` unless you intentionally enable live trading in a later phase.
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Default local database is SQLite (`backend/gnkalgo.db`). Set `DATABASE_URL` to PostgreSQL in production.
+
+## Product modules
+
+| Route | Purpose |
+|-------|---------|
+| `/login` `/register` | Auth with JWT, MFA, password rules |
+| `/dashboard` | Portfolio and activity summary |
+| `/orders` | Paper and live orders |
+| `/strategies` | Strategy builder: BUY/SELL, qty, paper/live, schedule every N minutes |
+| `/signals` | AI BUY/SELL/HOLD signals |
+| `/webhooks` | TradingView-style inbound webhooks |
+| `/subscribe` | **Share this URL with all users.** UPI plans ₹199 / ₹999 / ₹1,999 |
+| `/subscribe/pay` | PhonePe, GPay, Paytm intents + UTR |
+| `/admin` | Who registered, who logged in, active vs inactive, confirm UPI |
+
+After login, use the dashboard **Next product steps** checklist. Details: `docs/NEXT-STEPS.md`.
 
 ## Security
 
-Never commit PEM/key files, tokens, or broker credentials. Never log passwords, API secrets, TOTP, or access tokens.
+- Argon2 password hashing
+- Short-lived JWT access tokens + rotating refresh tokens
+- TOTP MFA
+- Encrypted broker credentials
+- HMAC + token for inbound webhooks
+- Risk checks (qty cap, market hours for live orders)
+- Audit logs
 
-## Broker configuration
+AI signals are **not investment advice**.
 
-Not implemented in Phase 1. Phase 5 adds Mock; Phase 6 adds DhanHQ from official documentation only.
+## Email / verification
 
-## Paper trading
+Set SMTP in `.env` (see `docs/EMAIL.md`). Until then, register shows a verify link in the app.
 
-Default mode is PAPER. There is no order execution in Phase 1.
+## Deploy
 
-## Production notes
+See `docs/DEPLOY.md`. Staging: `docker compose -f docker-compose.prod.yml up -d --build`
 
-Use Ubuntu 24.04, Docker, a real `.env`, TLS (Cloudflare/Nginx), and do not expose Postgres or Redis publicly. Production refuses `CHANGE_ME` for JWT and encryption keys.
+**Oracle Cloud + Ubuntu 24 + Nginx + Cloudflare:** `docs/DEPLOY-ORACLE.md`
 
-## License
+**E2E flow, all URLs, DB queries, start/stop:** `docs/E2E-PROJECT.md`
 
-[MIT](LICENSE)
+**Admin access (fix "Admin only"):** `docs/ADMIN-ACCESS.md`
+
+
+See `docs/PHASES.md`.

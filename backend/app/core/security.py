@@ -1,60 +1,63 @@
-"""Password hashing, session tokens, and authenticated secret encryption.
-
-Never log passwords, TOTP, API secrets, or access tokens.
-"""
-
-from __future__ import annotations
-
 import base64
 import hashlib
-import os
 import secrets
+from datetime import datetime, timedelta, timezone
 
-from argon2 import PasswordHasher
-from argon2.exceptions import InvalidHashError, VerifyMismatchError
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.fernet import Fernet
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 
-_HASHER = PasswordHasher()
-_AAD = b"gnkalgo-v1"
+from app.config import settings
+
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
-    return _HASHER.hash(password)
+    return pwd_context.hash(password)
 
 
-def verify_password(password_hash: str, password: str) -> bool:
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
+
+
+def _fernet() -> Fernet:
+    key = hashlib.sha256(settings.encryption_key.encode()).digest()
+    return Fernet(base64.urlsafe_b64encode(key))
+
+
+def encrypt_data(data: str) -> str:
+    return _fernet().encrypt(data.encode()).decode()
+
+
+def decrypt_data(encrypted: str) -> str:
+    return _fernet().decrypt(encrypted.encode()).decode()
+
+
+def create_access_token(subject: str, extra: dict | None = None) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_access_token_expire_minutes)
+    payload = {"sub": subject, "exp": expire, "type": "access"}
+    if extra:
+        payload.update(extra)
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
+
+
+def create_refresh_token(subject: str) -> tuple[str, datetime]:
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days)
+    payload = {"sub": subject, "exp": expire, "type": "refresh"}
+    token = jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
+    return token, expire
+
+
+def decode_token(token: str) -> dict | None:
     try:
-        return _HASHER.verify(password_hash, password)
-    except (VerifyMismatchError, InvalidHashError):
-        return False
+        return jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
+    except JWTError:
+        return None
 
 
-def new_session_token() -> str:
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def generate_secure_token() -> str:
     return secrets.token_urlsafe(32)
-
-
-def hash_session_token(token: str) -> str:
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
-
-
-def _aes_key(encryption_key: str) -> bytes:
-    return hashlib.sha256(encryption_key.encode("utf-8")).digest()
-
-
-def encrypt_secret(plaintext: str, encryption_key: str) -> str:
-    """Encrypt a secret with AES-GCM. Ciphertext is stored; plaintext is never logged."""
-    if not plaintext:
-        raise ValueError("plaintext must not be empty")
-    if not encryption_key:
-        raise ValueError("encryption_key must not be empty")
-    nonce = os.urandom(12)
-    aes = AESGCM(_aes_key(encryption_key))
-    packed = nonce + aes.encrypt(nonce, plaintext.encode("utf-8"), _AAD)
-    return base64.urlsafe_b64encode(packed).decode("ascii")
-
-
-def decrypt_secret(ciphertext: str, encryption_key: str) -> str:
-    raw = base64.urlsafe_b64decode(ciphertext.encode("ascii"))
-    nonce, data = raw[:12], raw[12:]
-    aes = AESGCM(_aes_key(encryption_key))
-    return aes.decrypt(nonce, data, _AAD).decode("utf-8")

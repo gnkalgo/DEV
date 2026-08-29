@@ -1,91 +1,67 @@
-"""Broker adapter contract. Application code depends only on these methods."""
-
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
-from datetime import datetime
+from dataclasses import dataclass
 from typing import Any
 
-from app.brokers.models import (
-    BrokerCredentials,
-    HoldingInfo,
-    MarginInfo,
-    OrderRequest,
-    OrderResponse,
-    PositionInfo,
-    Quote,
-)
+
+@dataclass
+class OrderRequest:
+    symbol: str
+    exchange: str
+    side: str  # BUY / SELL
+    quantity: int
+    order_type: str  # MARKET / LIMIT
+    price: float | None = None
+    product_type: str = "INTRADAY"
+    correlation_id: str | None = None
+
+
+@dataclass
+class OrderResponse:
+    order_id: str
+    status: str
+    broker_order_id: str | None = None
+    message: str | None = None
 
 
 class BrokerAdapter(ABC):
-    broker_code: str
-
-    def __init__(self, credentials: BrokerCredentials) -> None:
-        self.credentials = credentials
+    """Unified interface for Dhan and Groww broker APIs."""
 
     @abstractmethod
-    async def authenticate(self) -> dict[str, Any]:
-        """Establish or validate a session. Returns non-secret metadata only."""
+    async def authenticate(self, credentials: dict[str, Any]) -> bool:
+        """Validate credentials and obtain access token."""
 
     @abstractmethod
-    async def refresh_session(self) -> dict[str, Any]:
-        """Refresh an expiring session when supported."""
+    async def get_funds(self) -> dict[str, Any]:
+        """Return available margin and funds."""
 
     @abstractmethod
-    async def disconnect(self) -> None:
-        """Tear down adapter-local session state."""
+    async def get_holdings(self) -> list[dict[str, Any]]:
+        """Return equity holdings."""
 
     @abstractmethod
-    async def get_ltp(self, symbol: str, exchange: str) -> Quote:
-        ...
+    async def get_positions(self) -> list[dict[str, Any]]:
+        """Return open positions."""
 
     @abstractmethod
-    async def get_ohlcv(
-        self,
-        symbol: str,
-        exchange: str,
-        *,
-        interval: str,
-        start: datetime,
-        end: datetime,
-    ) -> list[dict[str, Any]]:
-        ...
-
-    @abstractmethod
-    async def get_option_chain(self, symbol: str, exchange: str) -> dict[str, Any]:
-        ...
-
-    @abstractmethod
-    async def get_margin(self) -> MarginInfo:
-        ...
-
-    @abstractmethod
-    async def get_positions(self) -> list[PositionInfo]:
-        ...
-
-    @abstractmethod
-    async def get_holdings(self) -> list[HoldingInfo]:
-        ...
+    async def get_orders(self) -> list[dict[str, Any]]:
+        """Return today's order book."""
 
     @abstractmethod
     async def place_order(self, order: OrderRequest) -> OrderResponse:
-        ...
+        """Place a new order."""
 
     @abstractmethod
-    async def modify_order(
-        self,
-        broker_order_id: str,
-        *,
-        quantity: int | None = None,
-        price: float | None = None,
-        order_type: str | None = None,
-    ) -> OrderResponse:
-        ...
+    async def modify_order(self, order_id: str, changes: dict[str, Any]) -> OrderResponse:
+        """Modify a pending order."""
 
     @abstractmethod
-    async def cancel_order(self, broker_order_id: str) -> OrderResponse:
-        ...
+    async def cancel_order(self, order_id: str) -> OrderResponse:
+        """Cancel a pending order."""
 
     @abstractmethod
-    async def get_order_status(self, broker_order_id: str) -> OrderResponse:
-        ...
+    async def get_market_quote(self, symbols: list[str]) -> dict[str, Any]:
+        """Fetch LTP / quote for symbols."""
+
+    @abstractmethod
+    async def health_check(self) -> bool:
+        """Verify broker connection is alive."""

@@ -122,18 +122,31 @@ def _add_profile_columns(sync_conn):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import logging
+
     from app.services.billing_scheduler import start_billing_scheduler
     from app.services.instrument_scheduler import bootstrap_instruments, start_instrument_scheduler
     from app.services.strategy_scheduler import start_strategy_scheduler
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        await conn.run_sync(_add_user_columns)
-        await conn.run_sync(_add_strategy_columns)
-        await conn.run_sync(_add_subscription_columns)
-        await conn.run_sync(_add_profile_columns)
+    log = logging.getLogger("uvicorn.error")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(_add_user_columns)
+            await conn.run_sync(_add_strategy_columns)
+            await conn.run_sync(_add_subscription_columns)
+            await conn.run_sync(_add_profile_columns)
+    except Exception:
+        log.exception(
+            "Database startup failed (check DATABASE_URL / POSTGRES_PASSWORD and that postgres is healthy)"
+        )
+        raise
 
-    await bootstrap_instruments()
+    try:
+        await bootstrap_instruments()
+    except Exception:
+        # Do not block API boot if instrument seed/sync fails
+        log.exception("Instrument bootstrap failed; continuing without full instrument seed")
 
     scheduler_task = start_strategy_scheduler()
     billing_task = start_billing_scheduler()

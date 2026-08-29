@@ -143,6 +143,13 @@ class InstrumentSyncService:
     async def _upsert_batch(self, db: AsyncSession, rows: list[dict]) -> int:
         if not rows:
             return 0
+        # Core insert() does not apply ORM Python defaults — ensure primary keys exist.
+        import uuid as _uuid
+
+        for row in rows:
+            if not row.get("id"):
+                row["id"] = _uuid.uuid4()
+
         dialect = engine.dialect.name
         if dialect == "postgresql":
             from sqlalchemy.dialects.postgresql import insert as pg_insert

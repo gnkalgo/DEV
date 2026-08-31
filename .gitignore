@@ -23,3 +23,23 @@ dist/
 agent-tools/
 
 artifacts/
+certbot/
+
+!.env.example
+
+.venv/
+venv/
+
+node_modules/
+dist/
+build/
+
+*.log
+
+
+*.pem
+*.key
+
+postgres-data/
+redis-data/
+

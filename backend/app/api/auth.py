@@ -101,6 +101,11 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
             db, data.email, data.password, data.mfa_code, request
         )
     except ValueError as e:
+        # Rejected logins can intentionally update security state (failed-attempt
+        # counters, lockouts, MFA backup-code use, and audit records).  Persist
+        # those changes before raising HTTPException, which otherwise causes the
+        # request-scoped session dependency to roll the transaction back.
+        await db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
     return TokenResponse(

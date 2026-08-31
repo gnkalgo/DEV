@@ -65,3 +65,36 @@ def test_register_verify_login():
         assert live.json()["status"] == "REJECTED"
         msg = live.json()["message"].lower()
         assert "subscription" in msg or "market hours" in msg
+
+
+def test_failed_logins_persist_and_lock_account():
+    with TestClient(app) as client:
+        email = f"lockout-{uuid.uuid4().hex[:8]}@gnkalgo.com"
+        password = "SecurePass1!"
+        register = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": email,
+                "password": password,
+                "full_name": "Lockout User",
+                "phone": f"97{uuid.uuid4().int % 10**8:08d}",
+            },
+        )
+        assert register.status_code == 201
+        token = register.json()["message"].split("token=")[-1]
+        assert client.post("/api/v1/auth/verify-email", json={"token": token}).status_code == 200
+
+        for _ in range(5):
+            failed = client.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": "WrongPass1!"},
+            )
+            assert failed.status_code == 401
+            assert failed.json()["detail"] == "Invalid email or password"
+
+        locked = client.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": password},
+        )
+        assert locked.status_code == 401
+        assert locked.json()["detail"] == "Account temporarily locked. Try again later."

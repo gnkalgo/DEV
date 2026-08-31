@@ -18,6 +18,7 @@ from app.core.security import (
     generate_secure_token,
     hash_password,
     hash_token,
+    password_needs_rehash,
     verify_password,
 )
 from app.models import (
@@ -121,6 +122,9 @@ class AuthService:
                 user.failed_login_attempts = 0
             await log_audit(db, "user.login_failed", user.id, request)
             raise ValueError("Invalid email or password")
+
+        if password_needs_rehash(user.password_hash):
+            user.password_hash = hash_password(password)
 
         if not user.is_verified:
             raise ValueError("Please verify your email before logging in")

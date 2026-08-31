@@ -1,13 +1,13 @@
+import asyncio
 import json
-import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.brokers.factory import get_broker_adapter
-from app.core.deps import get_current_user
-from app.core.security import decrypt_data, decode_token
+from app.core.deps import get_current_user, user_from_access_token
+from app.core.security import decrypt_data
 from app.database import AsyncSessionLocal, get_db
 from app.models import User
 from app.services.candle_service import candle_service
@@ -151,31 +151,29 @@ async def market_quote(
 
 @router.websocket("/ws")
 async def market_websocket(ws: WebSocket):
-    token = ws.query_params.get("token")
-    if not token:
-        await ws.close(code=4401)
-        return
-    payload = decode_token(token)
-    if not payload or payload.get("type") != "access":
-        await ws.close(code=4401)
-        return
-
-    user_id = str(payload.get("sub", ""))
-    if not user_id:
-        await ws.close(code=4401)
-        return
-
     await ws.accept()
+    try:
+        first = await asyncio.wait_for(ws.receive_text(), timeout=15)
+        auth = json.loads(first)
+    except Exception:
+        await ws.close(code=4401)
+        return
+    token = auth.get("token") if isinstance(auth, dict) else None
+    if auth.get("action") != "auth" or not token:
+        await ws.close(code=4401)
+        return
+
     dhan_creds: dict | None = None
+    user_id = ""
     async with AsyncSessionLocal() as db:
         try:
-            uid = uuid.UUID(user_id)
-            result = await db.execute(select(User).where(User.id == uid))
-            user = result.scalar_one_or_none()
-            if user:
-                dhan_creds = await _dhan_credentials(db, user)
+            user = await user_from_access_token(db, token)
+            user_id = str(user.id)
+            dhan_creds = await _dhan_credentials(db, user)
+            await db.commit()
         except Exception:
-            dhan_creds = None
+            await ws.close(code=4401)
+            return
 
     try:
         while True:

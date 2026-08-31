@@ -13,6 +13,8 @@ class OrderRequest:
     price: float | None = None
     product_type: str = "INTRADAY"
     correlation_id: str | None = None
+    security_id: str | None = None
+    exchange_segment: str | None = None
 
 
 @dataclass

@@ -1,7 +1,6 @@
 import hashlib
 import hmac
 import json
-import uuid
 
 from fastapi import Request
 from sqlalchemy import select
@@ -11,6 +10,7 @@ from app.config import settings
 from app.core.security import generate_secure_token, hash_token
 from app.models import User, Webhook, WebhookLog
 from app.schemas.trading import InboundWebhookPayload, PlaceOrderRequest, WebhookCreateRequest
+from app.services import billing_service
 from app.services.order_service import order_service
 
 
@@ -20,6 +20,9 @@ class WebhookService:
         return list(result.scalars().all())
 
     async def create(self, db: AsyncSession, user: User, data: WebhookCreateRequest) -> tuple[Webhook, str]:
+        sub = await billing_service.active_subscription(db, user)
+        if not sub:
+            raise ValueError("Active subscription required to create webhooks")
         raw_secret = generate_secure_token()
         webhook = Webhook(
             user_id=user.id,
@@ -40,6 +43,8 @@ class WebhookService:
         if not provided:
             return False
         expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        if len(provided) != len(expected):
+            return False
         return hmac.compare_digest(expected, provided)
 
     async def handle_inbound(
@@ -59,13 +64,18 @@ class WebhookService:
         if not webhook:
             raise ValueError("Webhook not found")
 
-        if raw_secret and hash_token(raw_secret) != webhook.secret_hash:
+        if not raw_secret:
+            raise ValueError("Webhook secret required")
+        if not hmac.compare_digest(hash_token(raw_secret), webhook.secret_hash):
             raise ValueError("Invalid webhook secret")
-        if signature and raw_secret and not self.verify_signature(raw_secret, raw_body, signature):
-            raise ValueError("Invalid HMAC signature")
+        if not signature or not self.verify_signature(raw_secret, raw_body, signature):
+            raise ValueError("HMAC signature required")
 
         user_result = await db.execute(select(User).where(User.id == webhook.user_id))
         user = user_result.scalar_one()
+        if not user.is_active:
+            raise ValueError("Webhook owner inactive")
+
         order = await order_service.place_order(
             db,
             user,

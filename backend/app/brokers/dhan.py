@@ -67,19 +67,31 @@ class DhanAdapter(BrokerAdapter):
         data = await self._request("GET", "/orders")
         return data if isinstance(data, list) else data.get("data", [])
 
-    async def place_order(self, order: OrderRequest) -> OrderResponse:
-        payload = {
-            "dhanClientId": self.client_id,
+    @staticmethod
+    def order_payload(order: OrderRequest) -> dict:
+        product = order.product_type.upper()
+        if product in ("INTRADAY", "INTRA"):
+            product = "INTRA"
+        elif product in ("CNC", "DELIVERY"):
+            product = "CNC"
+        return {
+            "dhanClientId": None,
             "transactionType": order.side,
-            "exchangeSegment": order.exchange,
-            "productType": order.product_type,
+            "exchangeSegment": order.exchange_segment or "NSE_EQ",
+            "productType": product,
             "orderType": order.order_type,
             "validity": "DAY",
-            "securityId": order.symbol,
+            "securityId": str(order.security_id or ""),
             "quantity": order.quantity,
             "price": order.price or 0,
             "correlationId": order.correlation_id,
         }
+
+    async def place_order(self, order: OrderRequest) -> OrderResponse:
+        if not order.security_id:
+            raise RuntimeError("Dhan orders require a numeric securityId")
+        payload = self.order_payload(order)
+        payload["dhanClientId"] = self.client_id
         data = await self._request("POST", "/orders", json=payload)
         return OrderResponse(
             order_id=str(data.get("orderId", "")),

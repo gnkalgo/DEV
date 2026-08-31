@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -57,6 +58,10 @@ def decode_token(token: str) -> dict | None:
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def tokens_match(plain: str, hashed: str) -> bool:
+    return hmac.compare_digest(hash_token(plain), hashed)
 
 
 def generate_secure_token() -> str:

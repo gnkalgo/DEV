@@ -115,7 +115,7 @@ class ProfileService:
             status = "ACTIVE" if active else "INACTIVE"
             if not connected and code in ("currency", "commodities"):
                 status = "NOT_AVAILABLE"
-        items.append(
+            items.append(
                 TradingSegmentResponse(code=code, name=name, status=status, icon=icon).model_dump()
             )
         return items

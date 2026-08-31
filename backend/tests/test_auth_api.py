@@ -56,3 +56,12 @@ def test_register_verify_login():
         )
         assert paper.status_code == 200
         assert paper.json()["status"] == "PAPER_FILLED"
+        live = client.post(
+            "/api/v1/orders/",
+            headers={"Authorization": f"Bearer {access}"},
+            json={"symbol": "RELIANCE", "side": "BUY", "quantity": 1, "paper_mode": False, "broker": "dhan"},
+        )
+        assert live.status_code == 200
+        assert live.json()["status"] == "REJECTED"
+        msg = live.json()["message"].lower()
+        assert "subscription" in msg or "market hours" in msg

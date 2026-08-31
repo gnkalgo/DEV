@@ -6,14 +6,15 @@ class Settings(BaseSettings):
 
     app_name: str = "GnKAlgo"
     app_env: str = "development"
-    debug: bool = True
+    debug: bool = False
     secret_key: str = "dev-secret-change-in-production"
     encryption_key: str = "dev-encryption-key-32bytes-min!!"
+    rate_limit_enabled: bool = True
 
     database_url: str = "sqlite+aiosqlite:///./gnkalgo.db"
     redis_url: str = "redis://localhost:6379/0"
 
-    jwt_access_token_expire_minutes: int = 60
+    jwt_access_token_expire_minutes: int = 15
     jwt_refresh_token_expire_days: int = 7
     jwt_algorithm: str = "HS256"
 
@@ -41,6 +42,7 @@ class Settings(BaseSettings):
     groww_client_secret: str = ""
 
     ml_service_url: str = "http://localhost:8001"
+    ml_service_token: str = ""
     backend_public_url: str = "http://localhost:8000"
     admin_emails: str = ""
     upi_vpa: str = "gnkalgo@upi"

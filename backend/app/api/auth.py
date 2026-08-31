@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.deps import get_current_user
+from app.core.limiter import limiter
 from app.database import get_db
 from app.models import User
 from app.schemas.auth import (
@@ -26,10 +27,20 @@ from app.services.session_service import session_service
 from app.services.auth_service import auth_service, broker_service
 from app.services.email_service import email_service
 
+
+def _unconfigured_smtp_message(action: str, url: str) -> MessageResponse:
+    if settings.app_env == "production":
+        return MessageResponse(
+            message=f"{action} requested. Check your inbox, or contact support if mail is delayed."
+        )
+    return MessageResponse(message=f"SMTP is not configured. {action} using this link: {url}")
+
+
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/register", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
 async def register(data: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
     try:
         user, verify_token = await auth_service.register(db, data, request)
@@ -47,12 +58,11 @@ async def register(data: RegisterRequest, request: Request, db: AsyncSession = D
             )
         return MessageResponse(message="Registration successful. Check your inbox for the verification link.")
 
-    return MessageResponse(
-        message=f"SMTP is not configured. Verify using this link: {verify_url}"
-    )
+    return _unconfigured_smtp_message("Verify", verify_url)
 
 
 @router.post("/resend-verification", response_model=MessageResponse)
+@limiter.limit("10/minute")
 async def resend_verification(
     data: ForgotPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)
 ):
@@ -71,7 +81,7 @@ async def resend_verification(
         except Exception as exc:
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Email failed to send: {exc}")
         return MessageResponse(message="If the email exists, a verification link has been sent.")
-    return MessageResponse(message=f"SMTP is not configured. Verify using this link: {verify_url}")
+    return _unconfigured_smtp_message("Verify", verify_url)
 
 
 @router.post("/verify-email", response_model=MessageResponse)
@@ -84,6 +94,7 @@ async def verify_email(data: VerifyEmailRequest, request: Request, db: AsyncSess
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("20/minute")
 async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     try:
         access, refresh, _ = await auth_service.login(
@@ -114,6 +125,7 @@ async def refresh_tokens(data: RefreshRequest, request: Request, db: AsyncSessio
 
 
 @router.post("/forgot-password", response_model=MessageResponse)
+@limiter.limit("10/minute")
 async def forgot_password(
     data: ForgotPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)
 ):
@@ -127,7 +139,7 @@ async def forgot_password(
         except Exception as exc:
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Email failed to send: {exc}")
         return MessageResponse(message="If the email exists, a reset link has been sent.")
-    return MessageResponse(message=f"SMTP is not configured. Reset using this link: {reset_url}")
+    return _unconfigured_smtp_message("Reset", reset_url)
 
 
 @router.post("/reset-password", response_model=MessageResponse)
@@ -243,7 +255,10 @@ async def connect_broker(
     if not credentials:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No credentials provided")
 
-    conn = await broker_service.connect(db, current_user, data.broker, credentials, request)
+    try:
+        conn = await broker_service.connect(db, current_user, data.broker, credentials, request)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return conn
 
 

@@ -51,12 +51,16 @@ class MarketWebSocket {
     }
     this.intentionalClose = false;
     this.setStatus("CONNECTING");
-    const url = `${wsBase()}/api/v1/market/ws?token=${encodeURIComponent(token)}`;
+    const url = `${wsBase()}/api/v1/market/ws`;
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
       this.reconnectDelay = 1000;
       this.setStatus("CONNECTED");
+      const token = getAccessToken();
+      if (token) {
+        this.send({ action: "auth", token });
+      }
       if (this.subscribed) {
         this.sendSubscribe(this.subscribed.symbol, this.subscribed.exchange);
       }

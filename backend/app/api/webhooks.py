@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
+from app.core.limiter import limiter
 from app.database import get_db
 from app.models import User
 from app.schemas.trading import InboundWebhookPayload, WebhookCreateRequest, WebhookResponse
@@ -37,7 +38,10 @@ async def create_webhook(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    webhook, secret = await webhook_service.create(db, current_user, data)
+    try:
+        webhook, secret = await webhook_service.create(db, current_user, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=402, detail=str(exc))
     return WebhookResponse(
         id=webhook.id,
         name=webhook.name,
@@ -52,15 +56,19 @@ async def create_webhook(
 
 
 @router.post("/in/{token}")
+@limiter.limit("60/minute")
 async def inbound_webhook(
-    token: str,
-    payload: InboundWebhookPayload,
     request: Request,
+    token: str,
     db: AsyncSession = Depends(get_db),
     x_gnkalgo_secret: str | None = Header(default=None),
     x_gnkalgo_signature: str | None = Header(default=None),
 ):
-    raw = payload.model_dump_json().encode()
+    raw = await request.body()
+    try:
+        payload = InboundWebhookPayload.model_validate_json(raw)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid webhook payload")
     try:
         log = await webhook_service.handle_inbound(
             db, token, payload, request, raw, x_gnkalgo_signature, x_gnkalgo_secret

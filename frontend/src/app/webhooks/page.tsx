@@ -41,7 +41,8 @@ export default function WebhooksPage() {
     <AppShell>
       <h1 className="text-3xl font-semibold">Webhooks</h1>
       <p className="mt-2 text-sm text-slate-400">
-        POST JSON with symbol, action, and qty to the inbound URL. Optional header X-Gnkalgo-Secret.
+        POST JSON with symbol, action, and qty to the inbound URL. Required headers:
+        X-Gnkalgo-Secret and X-Gnkalgo-Signature (hex HMAC-SHA256 of the raw body).
       </p>
       {error && <p className="mt-3 text-[#ff6b6b]">{error}</p>}
       <form onSubmit={create} className="mt-6 flex gap-3">

@@ -126,7 +126,7 @@ class AuthService:
         if password_needs_rehash(user.password_hash):
             user.password_hash = hash_password(password)
 
-        if not user.is_verified:
+        if not user.is_verified and (settings.app_env == "production" or bool(settings.smtp_host and settings.smtp_from)):
             raise ValueError("Please verify your email before logging in")
 
         if user.mfa_enabled:

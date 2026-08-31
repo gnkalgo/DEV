@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from cryptography.fernet import Fernet
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from passlib.exc import UnknownHashError
 
 from app.config import settings
 
@@ -18,7 +19,31 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    try:
+        return pwd_context.verify(plain, hashed)
+    except (TypeError, ValueError, UnknownHashError):
+        pass
+
+    if not hashed:
+        return False
+
+    # Older deployments stored a plain SHA-256 hex digest, which Passlib cannot
+    # identify. Keep compatibility for those records until they are rehashed.
+    legacy_candidates = (
+        hashlib.sha256(plain.encode()).hexdigest(),
+        hashlib.sha512(plain.encode()).hexdigest(),
+        hashlib.md5(plain.encode()).hexdigest(),
+    )
+    return any(hmac.compare_digest(candidate, hashed) for candidate in legacy_candidates)
+
+
+def password_needs_rehash(hashed: str) -> bool:
+    if not hashed:
+        return False
+    try:
+        return pwd_context.identify(hashed) is None
+    except (TypeError, ValueError, UnknownHashError):
+        return True
 
 
 def _fernet() -> Fernet:

@@ -31,6 +31,7 @@ export default function SettingsPage() {
   const [clientId, setClientId] = useState("");
   const [qr, setQr] = useState("");
   const [secret, setSecret] = useState("");
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [mfaCode, setMfaCode] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -66,10 +67,11 @@ export default function SettingsPage() {
   }
 
   async function setupMfa() {
-    const res = await api<{ qr_uri: string; secret: string }>("/api/v1/auth/mfa/setup", { method: "POST" }, true);
+    const res = await api<{ qr_uri: string; secret: string; backup_codes: string[] }>("/api/v1/auth/mfa/setup", { method: "POST" }, true);
     setQr(res.qr_uri);
     setSecret(res.secret);
-    setMessage("Add this secret in Google Authenticator or Authy, then enter a 6-digit code.");
+    setBackupCodes(res.backup_codes || []);
+    setMessage("Add this secret in Google Authenticator or Authy, then enter a 6-digit code. Save backup codes now.");
   }
 
   async function enableMfa(e: FormEvent) {
@@ -168,6 +170,9 @@ export default function SettingsPage() {
           <>
             <button type="button" onClick={setupMfa} className="mt-4 rounded-lg border border-[#1d3542] px-3 py-2 text-sm">Generate TOTP secret</button>
             {secret && <p className="mt-3 break-all text-xs text-slate-400">Secret: {secret}</p>}
+            {backupCodes.length > 0 && (
+              <p className="mt-2 break-all text-xs text-[#2ee6a6]">Backup codes: {backupCodes.join(" ")}</p>
+            )}
             {qr && <p className="mt-2 break-all text-xs text-slate-500">{qr}</p>}
             <form onSubmit={enableMfa} className="mt-4 flex flex-wrap gap-3">
               <input className="rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" placeholder="6-digit code" value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} />

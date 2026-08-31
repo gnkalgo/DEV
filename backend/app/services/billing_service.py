@@ -181,6 +181,8 @@ async def confirm_payment(db: AsyncSession, payment_id) -> Payment:
     payment = result.scalar_one_or_none()
     if not payment:
         raise ValueError("Payment not found")
+    if payment.status != "submitted" or not (payment.utr and str(payment.utr).strip()):
+        raise ValueError("Payment must have a submitted UTR before confirmation")
     now = datetime.now(timezone.utc)
     payment.status = "confirmed"
     payment.confirmed_at = now

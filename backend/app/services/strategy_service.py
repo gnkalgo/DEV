@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Strategy, StrategyRun, User
+from app.models import Order, Strategy, StrategyRun, User
 from app.schemas.trading import (
     PlaceOrderRequest,
     SmcIntradayRules,
@@ -15,7 +15,8 @@ from app.schemas.trading import (
     StrategyRules,
     StrategyUpdateRequest,
 )
-from app.services.candle_service import candle_service
+from app.services import billing_service
+from app.services.candle_service import BASE_PRICES, candle_service
 from app.services.order_service import order_service
 from app.services.strategy_evaluators.smc_intraday import evaluate_smc_intraday
 
@@ -117,6 +118,10 @@ class StrategyService:
         return "PAPER" if paper_mode else "LIVE"
 
     async def create(self, db: AsyncSession, user: User, data: StrategyCreateRequest) -> Strategy:
+        if not data.paper_mode:
+            sub = await billing_service.active_subscription(db, user)
+            if not sub:
+                raise ValueError("Active subscription required for live strategies")
         rules_json = build_rules_json(data)
         status = self._status_for_mode(data.paper_mode, data.schedule_enabled)
         strategy = Strategy(
@@ -155,6 +160,10 @@ class StrategyService:
             strategy.symbol = data.symbol.upper()
         if data.paper_mode is not None:
             strategy.paper_mode = data.paper_mode
+            if not strategy.paper_mode:
+                sub = await billing_service.active_subscription(db, user)
+                if not sub:
+                    raise ValueError("Active subscription required for live strategies")
         if data.max_quantity is not None:
             strategy.max_quantity = data.max_quantity
         if data.max_daily_loss is not None:
@@ -216,6 +225,63 @@ class StrategyService:
             return True
         return last + timedelta(minutes=strategy.interval_minutes) <= now
 
+    async def _daily_loss(self, db: AsyncSession, strategy: Strategy) -> float:
+        from zoneinfo import ZoneInfo
+
+        ist = ZoneInfo("Asia/Kolkata")
+        now = datetime.now(ist)
+        start = datetime.combine(now.date(), datetime.min.time(), tzinfo=ist).astimezone(timezone.utc)
+        result = await db.execute(
+            select(Order).where(
+                Order.strategy_id == strategy.id,
+                Order.created_at >= start,
+                Order.status.in_(("FILLED", "PAPER_FILLED")),
+            )
+        )
+        cashflow = 0.0
+        for order in result.scalars():
+            px = float(order.price or BASE_PRICES.get(order.symbol, 0) or 0)
+            notional = order.quantity * px
+            cashflow += -notional if order.side == "BUY" else notional
+        return -cashflow if cashflow < 0 else 0.0
+
+    async def _live_blocked(self, db: AsyncSession, user: User, strategy: Strategy) -> str | None:
+        if strategy.paper_mode:
+            return None
+        sub = await billing_service.active_subscription(db, user)
+        if not sub:
+            return "Active subscription required for live strategies"
+        return None
+
+    async def _place_strategy_order(
+        self,
+        db: AsyncSession,
+        user: User,
+        strategy: Strategy,
+        side: Literal["BUY", "SELL"],
+        qty: int,
+        scheduled: bool,
+    ):
+        blocked = await self._live_blocked(db, user, strategy)
+        if blocked:
+            raise ValueError(blocked)
+        if await self._daily_loss(db, strategy) >= strategy.max_daily_loss:
+            raise ValueError(f"Max daily loss {strategy.max_daily_loss} reached")
+        return await order_service.place_order(
+            db,
+            user,
+            PlaceOrderRequest(
+                symbol=strategy.symbol,
+                side=side,
+                quantity=qty,
+                paper_mode=strategy.paper_mode,
+                broker="paper" if strategy.paper_mode else "dhan",
+                product_type="INTRADAY",
+            ),
+            source="strategy_scheduler" if scheduled else "strategy",
+            strategy_id=strategy.id,
+        )
+
     async def _run_smc_intraday(
         self,
         db: AsyncSession,
@@ -249,20 +315,14 @@ class StrategyService:
             return run
 
         qty = min(rules.qty, strategy.max_quantity)
-        order = await order_service.place_order(
-            db,
-            user,
-            PlaceOrderRequest(
-                symbol=strategy.symbol,
-                side=signal.side,
-                quantity=qty,
-                paper_mode=strategy.paper_mode,
-                broker="paper" if strategy.paper_mode else "dhan",
-                product_type="INTRADAY",
-            ),
-            source="strategy_scheduler" if scheduled else "strategy",
-            strategy_id=strategy.id,
-        )
+        try:
+            order = await self._place_strategy_order(db, user, strategy, signal.side, qty, scheduled)
+        except ValueError as exc:
+            run.status = "FAILED"
+            run.notes = str(exc)
+            if scheduled:
+                strategy.last_scheduled_run_at = datetime.now(timezone.utc)
+            return run
         run.status = "COMPLETED" if order.status in ("PAPER_FILLED", "FILLED", "PENDING") else "FAILED"
         run.notes = (
             f"Order {order.id} status={order.status}; "
@@ -290,23 +350,20 @@ class StrategyService:
         if isinstance(rules, SmcIntradayRules):
             return await self._run_smc_intraday(db, user, strategy, rules, run, scheduled)
 
+        if scheduled:
+            run.status = "SKIPPED"
+            run.notes = "Simple strategies do not auto-trade on a schedule. Use SMC or Run once."
+            strategy.last_scheduled_run_at = datetime.now(timezone.utc)
+            return run
+
         side: Literal["BUY", "SELL"] = rules.action
         qty = min(rules.qty, strategy.max_quantity)
-
-        order = await order_service.place_order(
-            db,
-            user,
-            PlaceOrderRequest(
-                symbol=strategy.symbol,
-                side=side,
-                quantity=qty,
-                paper_mode=strategy.paper_mode,
-                broker="paper" if strategy.paper_mode else "dhan",
-                product_type="INTRADAY",
-            ),
-            source="strategy_scheduler" if scheduled else "strategy",
-            strategy_id=strategy.id,
-        )
+        try:
+            order = await self._place_strategy_order(db, user, strategy, side, qty, scheduled)
+        except ValueError as exc:
+            run.status = "FAILED"
+            run.notes = str(exc)
+            return run
         run.status = "COMPLETED" if order.status in ("PAPER_FILLED", "FILLED", "PENDING") else "FAILED"
         run.notes = f"Order {order.id} status={order.status}"
         if scheduled:

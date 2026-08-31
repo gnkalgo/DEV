@@ -45,7 +45,7 @@ function LoginForm() {
         <label className="mt-4 block text-sm">Password</label>
         <input className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
         <label className="mt-4 block text-sm">MFA code (if enabled)</label>
-        <input className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={mfa} onChange={(e) => setMfa(e.target.value)} inputMode="numeric" />
+        <input className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={mfa} onChange={(e) => setMfa(e.target.value)} placeholder="6-digit TOTP or backup code" />
         {error && <p className="mt-3 text-sm text-[#ff6b6b]">{error}</p>}
         <button disabled={loading} className="mt-6 w-full rounded-xl bg-[#2ee6a6] py-2.5 font-semibold text-[#071018]">
           {loading ? "Signing in..." : "Sign in"}

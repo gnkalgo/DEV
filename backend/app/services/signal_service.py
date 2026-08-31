@@ -11,9 +11,13 @@ class SignalService:
     async def fetch_and_store(self, db: AsyncSession, user: User, symbols: str = "RELIANCE,TCS,INFY,HDFCBANK") -> list[Signal]:
         async with httpx.AsyncClient(timeout=20.0) as client:
             try:
+                headers = {}
+                if settings.ml_service_token:
+                    headers["X-ML-Service-Token"] = settings.ml_service_token
                 response = await client.get(
                     f"{settings.ml_service_url}/ml/v1/signals/batch",
                     params={"symbols": symbols},
+                    headers=headers,
                 )
                 response.raise_for_status()
                 payload = response.json()

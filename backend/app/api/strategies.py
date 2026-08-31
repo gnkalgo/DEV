@@ -29,7 +29,8 @@ async def create_strategy(
     try:
         return await strategy_service.create(db, current_user, data)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        code = 402 if "subscription" in str(exc).lower() else 400
+        raise HTTPException(status_code=code, detail=str(exc))
 
 
 @router.put("/{strategy_id}", response_model=StrategyResponse)
@@ -42,7 +43,10 @@ async def update_strategy(
     try:
         return await strategy_service.update(db, current_user, strategy_id, data)
     except ValueError as exc:
-        raise HTTPException(status_code=404 if "not found" in str(exc).lower() else 400, detail=str(exc))
+        if "not found" in str(exc).lower():
+            raise HTTPException(status_code=404, detail=str(exc))
+        code = 402 if "subscription" in str(exc).lower() else 400
+        raise HTTPException(status_code=code, detail=str(exc))
 
 
 @router.post("/{strategy_id}/status")

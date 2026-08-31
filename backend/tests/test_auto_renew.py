@@ -27,8 +27,9 @@ def _register_login(client: TestClient, email: str) -> str:
             "phone": f"98{uuid.uuid4().int % 10**8:08d}",
         },
     )
-    token = res.json()["message"].split("token=")[-1]
-    client.post("/api/v1/auth/verify-email", json={"token": token})
+    if res.status_code == 201:
+        token = res.json()["message"].split("token=")[-1]
+        client.post("/api/v1/auth/verify-email", json={"token": token})
     login = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     return login.json()["access_token"]
 

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import Request
 from sqlalchemy import select
@@ -10,6 +11,9 @@ from app.core.deps import log_audit
 from app.core.security import generate_secure_token
 from app.models import BrokerConnection, BrokerType, Order, User
 from app.schemas.trading import PlaceOrderRequest
+from app.services import billing_service
+from app.services.instrument_segments import dhan_exchange_segment
+from app.services.instrument_service import instrument_service
 from app.services.risk import RiskRejection, validate_order
 
 
@@ -19,6 +23,37 @@ class OrderService:
             select(Order).where(Order.user_id == user.id).order_by(Order.created_at.desc())
         )
         return list(result.scalars().all())
+
+    async def _reject(
+        self,
+        db: AsyncSession,
+        user: User,
+        data: PlaceOrderRequest,
+        reason: str,
+        strategy_id: uuid.UUID | None,
+        webhook_id: uuid.UUID | None,
+        source: str,
+    ) -> Order:
+        order = Order(
+            user_id=user.id,
+            broker=data.broker,
+            symbol=data.symbol.upper(),
+            exchange=data.exchange,
+            side=data.side,
+            quantity=data.quantity,
+            order_type=data.order_type,
+            price=data.price,
+            product_type=data.product_type,
+            status="REJECTED",
+            correlation_id=data.correlation_id or generate_secure_token()[:16],
+            strategy_id=strategy_id,
+            webhook_id=webhook_id,
+            source=source,
+            message=reason,
+        )
+        db.add(order)
+        await db.flush()
+        return order
 
     async def place_order(
         self,
@@ -30,29 +65,19 @@ class OrderService:
         strategy_id: uuid.UUID | None = None,
         webhook_id: uuid.UUID | None = None,
     ) -> Order:
+        paper = data.paper_mode or data.broker == "paper"
         try:
-            validate_order(quantity=data.quantity, paper_mode=data.paper_mode)
+            validate_order(quantity=data.quantity, paper_mode=paper)
         except RiskRejection as exc:
-            order = Order(
-                user_id=user.id,
-                broker=data.broker,
-                symbol=data.symbol.upper(),
-                exchange=data.exchange,
-                side=data.side,
-                quantity=data.quantity,
-                order_type=data.order_type,
-                price=data.price,
-                product_type=data.product_type,
-                status="REJECTED",
-                correlation_id=data.correlation_id or generate_secure_token()[:16],
-                strategy_id=strategy_id,
-                webhook_id=webhook_id,
-                source=source,
-                message=exc.reason,
-            )
-            db.add(order)
-            await db.flush()
-            return order
+            return await self._reject(db, user, data, exc.reason, strategy_id, webhook_id, source)
+
+        if not paper:
+            sub = await billing_service.active_subscription(db, user)
+            if not sub:
+                return await self._reject(
+                    db, user, data, "Active subscription required for live trading",
+                    strategy_id, webhook_id, source,
+                )
 
         order = Order(
             user_id=user.id,
@@ -73,7 +98,7 @@ class OrderService:
         db.add(order)
         await db.flush()
 
-        if data.paper_mode or data.broker == "paper":
+        if paper:
             order.status = "PAPER_FILLED"
             order.broker = "paper"
             order.message = "Paper fill — no live broker call"
@@ -84,6 +109,14 @@ class OrderService:
         if not user.mfa_enabled:
             order.status = "REJECTED"
             order.message = "Enable MFA in Settings before placing live orders"
+            return order
+
+        inst = await instrument_service.resolve(db, order.symbol, order.exchange)
+        if not inst:
+            inst = instrument_service.curated_fallback(order.symbol)
+        if not inst or not inst.get("security_id"):
+            order.status = "REJECTED"
+            order.message = f"Unknown instrument {order.symbol} on {order.exchange}"
             return order
 
         conn_result = await db.execute(
@@ -99,6 +132,10 @@ class OrderService:
             order.message = f"No active {data.broker} connection"
             return order
 
+        segment = inst.get("segment") or "EQUITY"
+        exchange_segment = inst.get("exchange_segment") or dhan_exchange_segment(
+            inst.get("exchange", order.exchange), segment
+        )
         try:
             adapter = get_broker_adapter(connection)
             response = await adapter.place_order(
@@ -111,6 +148,8 @@ class OrderService:
                     price=order.price,
                     product_type=order.product_type,
                     correlation_id=order.correlation_id,
+                    security_id=str(inst["security_id"]),
+                    exchange_segment=exchange_segment,
                 )
             )
             order.broker_order_id = response.broker_order_id

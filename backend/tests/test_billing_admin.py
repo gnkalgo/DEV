@@ -25,11 +25,13 @@ def _register_login(client: TestClient, email: str) -> str:
             "phone": f"98{uuid.uuid4().int % 10**8:08d}",
         },
     )
-    assert res.status_code == 201
-    token = res.json()["message"].split("token=")[-1]
-    assert client.post("/api/v1/auth/verify-email", json={"token": token}).status_code == 200
+    if res.status_code == 201:
+        message = res.json()["message"]
+        if "token=" in message:
+            token = message.split("token=")[-1]
+            client.post("/api/v1/auth/verify-email", json={"token": token})
     login = client.post("/api/v1/auth/login", json={"email": email, "password": password})
-    assert login.status_code == 200
+    assert login.status_code == 200, login.text
     return login.json()["access_token"]
 
 
@@ -104,3 +106,21 @@ def test_admin_stats_and_confirm_payment():
         me = client.get("/api/v1/billing/me", headers={"Authorization": f"Bearer {buyer_access}"})
         assert me.json()["active"] is True
         assert me.json()["subscription"]["plan_code"] == "5DAYS"
+
+
+def test_admin_cannot_confirm_without_utr():
+    with TestClient(app) as client:
+        admin_access = _register_login(client, "owner@gnkalgo.com")
+        buyer_access = _register_login(client, f"buyer-{uuid.uuid4().hex[:8]}@gnkalgo.com")
+        checkout = client.post(
+            "/api/v1/billing/checkout",
+            headers={"Authorization": f"Bearer {buyer_access}"},
+            json={"plan_code": "DAILY"},
+        )
+        payment_id = checkout.json()["payment_id"]
+        confirm = client.post(
+            f"/api/v1/admin/payments/{payment_id}/confirm",
+            headers={"Authorization": f"Bearer {admin_access}"},
+        )
+        assert confirm.status_code == 400
+

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,6 +6,7 @@ from app.core.deps import get_current_user
 from app.database import get_db
 from app.models import Signal, User
 from app.schemas.trading import SignalResponse
+from app.services import billing_service
 from app.services.signal_service import signal_service
 
 router = APIRouter(prefix="/signals", tags=["AI Signals"])
@@ -28,4 +29,7 @@ async def generate_signals(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    sub = await billing_service.active_subscription(db, current_user)
+    if not sub:
+        raise HTTPException(status_code=402, detail="Active subscription required for AI signals")
     return await signal_service.fetch_and_store(db, current_user, symbols)

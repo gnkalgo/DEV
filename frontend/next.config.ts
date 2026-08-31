@@ -6,8 +6,16 @@ const backendInternal =
   "http://localhost:8000";
 
 const nextConfig: NextConfig = {
-  async rewrites() {
+    async rewrites() {
     return [
+      {
+        source: "/api/v1/:path*",
+        destination: `${backendInternal}/api/v1/:path*`,
+      },
+      {
+        source: "/v1/:path*",
+        destination: `${backendInternal}/v1/:path*`,
+      },
       {
         source: "/api-proxy/:path*",
         destination: `${backendInternal}/:path*`,

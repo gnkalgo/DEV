@@ -4,9 +4,9 @@ import asyncio
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
+from slowapi.middleware import SlowAPIMiddleware
 
 from sqlalchemy import text
 
@@ -23,13 +23,12 @@ from app.api.signals import router as signals_router
 from app.api.strategies import router as strategies_router
 from app.api.webhooks import router as webhooks_router
 from app.config import settings
+from app.core.limiter import limiter
 from app.database import Base, engine
 from app.models import billing as _billing_models  # noqa: F401
 from app.models import instrument as _instrument_models  # noqa: F401
 from app.models import trading as _trading_models  # noqa: F401
 from app.models import user as _user_models  # noqa: F401
-
-limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 
 def _add_user_columns(sync_conn):
@@ -95,6 +94,17 @@ def _add_subscription_columns(sync_conn):
     )
 
 
+def _add_mfa_columns(sync_conn):
+    dialect = sync_conn.dialect.name
+    if dialect == "sqlite":
+        cols = {row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(users)")}
+        if "mfa_backup_hashes" not in cols:
+            sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN mfa_backup_hashes TEXT")
+        return
+    sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_backup_hashes TEXT")
+    sync_conn.exec_driver_sql("ALTER TABLE users ALTER COLUMN mfa_secret TYPE TEXT")
+
+
 def _add_profile_columns(sync_conn):
     dialect = sync_conn.dialect.name
     user_cols = {
@@ -136,6 +146,7 @@ async def lifespan(app: FastAPI):
             await conn.run_sync(_add_strategy_columns)
             await conn.run_sync(_add_subscription_columns)
             await conn.run_sync(_add_profile_columns)
+            await conn.run_sync(_add_mfa_columns)
     except Exception:
         log.exception(
             "Database startup failed (check DATABASE_URL / POSTGRES_PASSWORD and that postgres is healthy)"
@@ -172,17 +183,21 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
+_docs = "/docs" if settings.app_env != "production" else None
+_redoc = "/redoc" if settings.app_env != "production" else None
+
 app = FastAPI(
     title="GnKAlgo API",
     description="Indian Algo Trading Platform API — www.gnkalgo.com",
     version="0.1.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=_docs,
+    redoc_url=_redoc,
 )
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

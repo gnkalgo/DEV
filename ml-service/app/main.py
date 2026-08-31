@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException
+import os
+
+from fastapi import FastAPI, Header, HTTPException
 
 from app.models.classifier import SignalClassifier
 from app.pipelines.signal_pipeline import create_training_data, generate_signals
@@ -12,6 +14,15 @@ app = FastAPI(
 )
 
 classifier = SignalClassifier()
+ML_TOKEN = os.environ.get("ML_SERVICE_TOKEN", "")
+
+
+def _require_ml_token(x_ml_service_token: str | None) -> None:
+    env = os.environ.get("APP_ENV", "development")
+    if env != "production" and not ML_TOKEN:
+        return
+    if not ML_TOKEN or x_ml_service_token != ML_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 def _mock_ohlcv(symbol: str) -> dict:
@@ -38,7 +49,8 @@ async def health():
 
 
 @app.post("/ml/v1/predict", response_model=PredictResponse)
-async def predict(request: PredictRequest):
+async def predict(request: PredictRequest, x_ml_service_token: str | None = Header(default=None)):
+    _require_ml_token(x_ml_service_token)
     try:
         features = [request.features[col] for col in FEATURE_COLUMNS]
     except KeyError as e:
@@ -55,7 +67,8 @@ async def predict(request: PredictRequest):
 
 
 @app.post("/ml/v1/train", response_model=TrainResponse)
-async def train(request: TrainRequest):
+async def train(request: TrainRequest, x_ml_service_token: str | None = Header(default=None)):
+    _require_ml_token(x_ml_service_token)
     ohlcv = {}
     for symbol in request.symbols:
         ohlcv.update(_mock_ohlcv(symbol))
@@ -69,7 +82,8 @@ async def train(request: TrainRequest):
 
 
 @app.get("/ml/v1/signals/batch")
-async def batch_signals(symbols: str = "RELIANCE,TCS,INFY"):
+async def batch_signals(symbols: str = "RELIANCE,TCS,INFY", x_ml_service_token: str | None = Header(default=None)):
+    _require_ml_token(x_ml_service_token)
     symbol_list = [s.strip() for s in symbols.split(",")]
     ohlcv = {}
     for symbol in symbol_list:

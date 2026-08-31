@@ -1,4 +1,5 @@
 import json
+import hmac
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -12,6 +13,7 @@ from app.core.deps import log_audit
 from app.core.security import (
     create_access_token,
     create_refresh_token,
+    decrypt_data,
     encrypt_data,
     generate_secure_token,
     hash_password,
@@ -34,7 +36,7 @@ class AuthService:
     LOCKOUT_MINUTES = 15
 
     async def register(self, db: AsyncSession, data: RegisterRequest, request: Request) -> tuple[User, str]:
-        existing = await db.execute(select(User).where(User.email == data.email))
+        existing = await db.execute(select(User).where(User.email == data.email.lower()))
         if existing.scalar_one_or_none():
             raise ValueError("Email already registered")
 
@@ -44,7 +46,7 @@ class AuthService:
                 raise ValueError("Phone number already registered")
 
         user = User(
-            email=data.email,
+            email=data.email.lower(),
             phone=data.phone,
             full_name=data.full_name,
             password_hash=hash_password(data.password),
@@ -63,7 +65,7 @@ class AuthService:
         return user, raw_token
 
     async def create_verification_token(self, db: AsyncSession, email: str) -> str:
-        result = await db.execute(select(User).where(User.email == email))
+        result = await db.execute(select(User).where(User.email == email.lower()))
         user = result.scalar_one_or_none()
         if not user:
             raise ValueError("If the email exists, a verification link has been sent.")
@@ -101,10 +103,13 @@ class AuthService:
     async def login(
         self, db: AsyncSession, email: str, password: str, mfa_code: str | None, request: Request
     ) -> tuple[str, str, User]:
-        result = await db.execute(select(User).where(User.email == email))
+        result = await db.execute(select(User).where(User.email == email.lower()))
         user = result.scalar_one_or_none()
         if not user:
             raise ValueError("Invalid email or password")
+
+        if not user.is_active:
+            raise ValueError("Account is disabled")
 
         if user.locked_until and user.locked_until > datetime.now(timezone.utc):
             raise ValueError("Account temporarily locked. Try again later.")
@@ -123,8 +128,7 @@ class AuthService:
         if user.mfa_enabled:
             if not mfa_code:
                 raise ValueError("MFA code required")
-            totp = pyotp.TOTP(user.mfa_secret)
-            if not totp.verify(mfa_code, valid_window=1):
+            if not self._verify_mfa(user, mfa_code):
                 await log_audit(db, "user.mfa_failed", user.id, request)
                 raise ValueError("Invalid MFA code")
 
@@ -134,7 +138,6 @@ class AuthService:
         if user.email.lower() in settings.admin_email_list:
             user.is_admin = True
 
-        access = create_access_token(str(user.id))
         refresh, expires = create_refresh_token(str(user.id))
 
         session = UserSession(
@@ -146,6 +149,8 @@ class AuthService:
             last_active_at=datetime.now(timezone.utc),
         )
         db.add(session)
+        await db.flush()
+        access = create_access_token(str(user.id), extra={"sid": str(session.id)})
         await log_audit(db, "user.login_success", user.id, request)
         return access, refresh, user
 
@@ -172,7 +177,6 @@ class AuthService:
 
         session.revoked = True
         user_id = payload["sub"]
-        access = create_access_token(user_id)
         new_refresh, expires = create_refresh_token(user_id)
 
         new_session = UserSession(
@@ -184,28 +188,62 @@ class AuthService:
             last_active_at=datetime.now(timezone.utc),
         )
         db.add(new_session)
+        await db.flush()
+        access = create_access_token(user_id, extra={"sid": str(new_session.id)})
         await log_audit(db, "user.token_refreshed", uuid.UUID(user_id), request)
         return access, new_refresh
 
+    def _plain_mfa_secret(self, user: User) -> str | None:
+        if not user.mfa_secret:
+            return None
+        try:
+            return decrypt_data(user.mfa_secret)
+        except Exception:
+            return user.mfa_secret
+
+    def _verify_mfa(self, user: User, code: str) -> bool:
+        secret = self._plain_mfa_secret(user)
+        if secret:
+            totp = pyotp.TOTP(secret)
+            if totp.verify(code.strip(), valid_window=1):
+                return True
+        if not user.mfa_backup_hashes:
+            return False
+        hashes: list[str] = json.loads(user.mfa_backup_hashes)
+        candidate = hash_token(code.strip())
+        remaining: list[str] = []
+        matched = False
+        for stored in hashes:
+            if not matched and hmac.compare_digest(candidate, stored):
+                matched = True
+                continue
+            remaining.append(stored)
+        if matched:
+            user.mfa_backup_hashes = json.dumps(remaining)
+        return matched
+
     async def setup_mfa(self, db: AsyncSession, user: User) -> tuple[str, str, list[str]]:
         secret = pyotp.random_base32()
-        user.mfa_secret = secret
+        user.mfa_secret = encrypt_data(secret)
         totp = pyotp.TOTP(secret)
         qr_uri = totp.provisioning_uri(name=user.email, issuer_name="GnKAlgo")
-        backup_codes = [generate_secure_token()[:8] for _ in range(5)]
+        backup_codes = [generate_secure_token()[:8].upper() for _ in range(5)]
+        user.mfa_backup_hashes = json.dumps([hash_token(c) for c in backup_codes])
+        user.mfa_enabled = False
         return secret, qr_uri, backup_codes
 
     async def enable_mfa(self, db: AsyncSession, user: User, code: str, request: Request) -> None:
-        if not user.mfa_secret:
+        secret = self._plain_mfa_secret(user)
+        if not secret:
             raise ValueError("MFA not initialized. Call setup first.")
-        totp = pyotp.TOTP(user.mfa_secret)
-        if not totp.verify(code, valid_window=1):
+        totp = pyotp.TOTP(secret)
+        if not totp.verify(code.strip(), valid_window=1):
             raise ValueError("Invalid MFA code")
         user.mfa_enabled = True
         await log_audit(db, "user.mfa_enabled", user.id, request)
 
     async def forgot_password(self, db: AsyncSession, email: str, request: Request) -> str | None:
-        result = await db.execute(select(User).where(User.email == email))
+        result = await db.execute(select(User).where(User.email == email.lower()))
         user = result.scalar_one_or_none()
         if not user:
             return None
@@ -255,6 +293,25 @@ class BrokerService:
         request: Request,
     ) -> BrokerConnection:
         broker_enum = BrokerType(broker)
+        if broker_enum == BrokerType.DHAN:
+            from app.brokers.dhan import DhanAdapter
+
+            adapter = DhanAdapter(
+                access_token=credentials.get("access_token") or credentials.get("api_key") or "",
+                client_id=credentials.get("client_id"),
+            )
+        else:
+            from app.brokers.groww import GrowwAdapter
+
+            adapter = GrowwAdapter(
+                access_token=credentials.get("access_token") or credentials.get("api_key") or "",
+            )
+        try:
+            await adapter.authenticate(credentials)
+            health = "connected"
+        except Exception as exc:
+            raise ValueError(f"Broker credentials rejected: {exc}") from exc
+
         creds_json = json.dumps(credentials)
         encrypted = encrypt_data(creds_json)
 
@@ -267,15 +324,16 @@ class BrokerService:
         conn = existing.scalar_one_or_none()
         if conn:
             conn.encrypted_credentials = encrypted
+            conn.client_id = credentials.get("client_id") or conn.client_id
             conn.is_active = True
-            conn.health_status = "connected"
+            conn.health_status = health
         else:
             conn = BrokerConnection(
                 user_id=user.id,
                 broker=broker_enum,
                 encrypted_credentials=encrypted,
                 client_id=credentials.get("client_id"),
-                health_status="connected",
+                health_status=health,
             )
             db.add(conn)
 

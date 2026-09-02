@@ -1,15 +1,13 @@
-"""Indian market indices and session status. Mock ticks only in development."""
+"""Indian market indices and session status with honest source metadata."""
 
-import random
 from datetime import datetime, time, timezone
 from zoneinfo import ZoneInfo
 
-from app.config import settings
 from app.services.market_quote_cache import get_by_symbol
 
 IST = ZoneInfo("Asia/Kolkata")
 
-# Base snapshot — not live; dev mock drifts slightly. Production should use a real feed.
+# Reference snapshot used only when an authenticated broker feed is unavailable.
 _INDEX_BASE = [
     ("NIFTY 50", "NIFTY50", 24175.65, 84.80, 0.35),
     ("BANKNIFTY", "BANKNIFTY", 57496.30, -13.65, -0.02),
@@ -52,7 +50,6 @@ def market_session() -> dict:
 
 
 def get_indices() -> dict:
-    use_mock_drift = settings.app_env != "production" or settings.debug
     items = []
     live_count = 0
     for name, key, base_ltp, base_chg, base_chg_pct in _INDEX_BASE:
@@ -64,11 +61,6 @@ def get_indices() -> dict:
             live_count += 1
         else:
             ltp, chg, chg_pct = base_ltp, base_chg, base_chg_pct
-            if use_mock_drift:
-                drift = random.uniform(-0.15, 0.15)
-                ltp = round(ltp * (1 + drift / 100), 2)
-                chg = round(chg + drift, 2)
-                chg_pct = round(chg_pct + drift / 10, 2)
         items.append(
             {
                 "name": name,
@@ -76,19 +68,18 @@ def get_indices() -> dict:
                 "ltp": ltp,
                 "change": chg,
                 "change_pct": chg_pct,
+                "is_live": bool(cached and cached.get("ltp")),
             }
         )
 
     if live_count > 0:
         source = "dhan_live"
-    elif use_mock_drift:
-        source = "mock_dev"
     else:
-        source = "static"
+        source = "reference_snapshot"
 
     return {
         "indices": items,
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "source": source,
-        "disclaimer": "Not investment advice.",
+        "disclaimer": "Unavailable quotes are clearly marked as reference data. Not investment advice.",
     }

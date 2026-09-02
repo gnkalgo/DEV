@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { HomeBackButton } from "@/components/HomeBackButton";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -31,7 +32,7 @@ export default function RootLayout({
         <script>{themeInitScript}</script>
       </head>
       <body className="antialiased min-h-screen">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider><HomeBackButton />{children}</ThemeProvider>
       </body>
     </html>
   );

@@ -7,6 +7,7 @@ class MarketDataService {
   private indices: MarketIndex[] = [];
   private status: MarketStatus | null = null;
   private source = "";
+  private updatedAt = "";
   private listeners = new Set<Listener>();
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private connecting = false;
@@ -23,6 +24,8 @@ class MarketDataService {
     return this.source;
   }
 
+  getUpdatedAt(): string { return this.updatedAt; }
+
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -37,12 +40,13 @@ class MarketDataService {
     this.connecting = true;
     try {
       const [indicesRes, statusRes] = await Promise.all([
-        api<MarketIndicesResponse>("/api/v1/market/indices"),
+        api<MarketIndicesResponse>("/api/v1/market/indices", {}, true),
         api<MarketStatus>("/api/v1/market/status"),
       ]);
       this.indices = indicesRes.indices;
       this.status = statusRes;
       this.source = indicesRes.source;
+      this.updatedAt = indicesRes.updated_at;
       this.notify();
     } finally {
       this.connecting = false;

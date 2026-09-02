@@ -4,6 +4,7 @@ export type MarketIndex = {
   ltp: number;
   change: number;
   change_pct: number;
+  is_live?: boolean;
 };
 
 export type MarketStatus = {

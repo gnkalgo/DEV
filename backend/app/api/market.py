@@ -1,11 +1,13 @@
 import asyncio
 import json
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.brokers.factory import get_broker_adapter
+from app.brokers.dhan import DhanAdapter
 from app.core.deps import get_current_user, user_from_access_token
 from app.core.security import decrypt_data
 from app.database import AsyncSessionLocal, get_db
@@ -33,8 +35,56 @@ async def _dhan_credentials(db: AsyncSession, user: User) -> dict | None:
 
 
 @router.get("/indices")
-async def market_indices():
-    return get_indices()
+async def market_indices(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    snapshot = get_indices()
+    credentials = await _dhan_credentials(db, current_user)
+    if not credentials:
+        return snapshot
+
+    # Dhan index security IDs from its instrument master. Fetch in one request
+    # to avoid rate-limit pressure from per-index polling.
+    security_ids = {
+        "NIFTY50": "13",
+        "BANKNIFTY": "25",
+        "NIFTYFINSERVICE": "27",
+        "NIFTYNEXT50": "38",
+        "NIFTYMIDCAP100": "442",
+        "INDIAVIX": "21",
+    }
+    try:
+        adapter = DhanAdapter(
+            access_token=credentials.get("access_token") or credentials.get("api_key") or "",
+            client_id=credentials.get("client_id"),
+        )
+        payload = await adapter.get_market_ohlc({"IDX_I": list(security_ids.values())})
+        quotes = payload.get("data", {}).get("IDX_I", {})
+        live_count = 0
+        for item in snapshot["indices"]:
+            quote = quotes.get(security_ids.get(item["symbol"], ""))
+            if not quote:
+                continue
+            ltp = float(quote.get("last_price", 0) or 0)
+            previous = float((quote.get("ohlc") or {}).get("close", 0) or 0)
+            if not ltp:
+                continue
+            change = ltp - previous if previous else 0.0
+            item.update(
+                ltp=round(ltp, 2),
+                change=round(change, 2),
+                change_pct=round(change / previous * 100, 2) if previous else 0.0,
+                is_live=True,
+            )
+            live_count += 1
+        if live_count:
+            snapshot["source"] = "dhan_live" if live_count == len(snapshot["indices"]) else "dhan_live_partial"
+            snapshot["updated_at"] = datetime.now(timezone.utc).isoformat()
+    except Exception:
+        # Keep the last/reference snapshot available, but never mislabel it live.
+        pass
+    return snapshot
 
 
 @router.get("/status")

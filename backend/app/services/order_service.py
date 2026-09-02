@@ -158,6 +158,11 @@ class OrderService:
                     correlation_id=order.correlation_id,
                     security_id=str(inst["security_id"]),
                     exchange_segment=exchange_segment,
+                    instrument_token=(
+                        f"{order.exchange}_EQ|{inst['isin']}"
+                        if data.broker == "upstox" and inst.get("isin")
+                        else inst.get("instrument_token")
+                    ),
                 )
             )
             order.broker_order_id = response.broker_order_id

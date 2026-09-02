@@ -15,6 +15,7 @@ class OrderRequest:
     correlation_id: str | None = None
     security_id: str | None = None
     exchange_segment: str | None = None
+    instrument_token: str | None = None
 
 
 @dataclass

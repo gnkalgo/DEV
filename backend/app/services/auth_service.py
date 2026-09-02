@@ -312,12 +312,16 @@ class BrokerService:
                 access_token=credentials.get("access_token") or credentials.get("api_key") or "",
                 client_id=credentials.get("client_id"),
             )
-        else:
+        elif broker_enum == BrokerType.GROWW:
             from app.brokers.groww import GrowwAdapter
 
             adapter = GrowwAdapter(
                 access_token=credentials.get("access_token") or credentials.get("api_key") or "",
             )
+        else:
+            from app.brokers.upstox import UpstoxAdapter
+
+            adapter = UpstoxAdapter(access_token=credentials.get("access_token") or "")
         try:
             await adapter.authenticate(credentials)
             health = "connected"

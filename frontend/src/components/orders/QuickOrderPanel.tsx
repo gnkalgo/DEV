@@ -27,6 +27,7 @@ export function QuickOrderPanel({
   const [price, setPrice] = useState("");
   const [triggerPrice, setTriggerPrice] = useState("");
   const [paperMode, setPaperMode] = useState(true);
+  const [liveBroker, setLiveBroker] = useState<"dhan" | "upstox">("dhan");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState(false);
@@ -52,7 +53,7 @@ export function QuickOrderPanel({
           product_type: productType,
           price: price ? Number(price) : null,
           paper_mode: paperMode,
-          broker: paperMode ? "paper" : "dhan",
+          broker: paperMode ? "paper" : liveBroker,
           live_confirmation: paperMode ? null : liveConfirmation,
         }),
       }, true);
@@ -116,6 +117,7 @@ export function QuickOrderPanel({
           <input type="checkbox" checked={paperMode} onChange={(e) => setPaperMode(e.target.checked)} />
           Paper mode (no live broker call)
         </label>
+        {!paperMode && <TerminalSelect value={liveBroker} onChange={(e) => setLiveBroker(e.target.value as "dhan" | "upstox")}><option value="dhan">Dhan LIVE</option><option value="upstox">Upstox LIVE</option></TerminalSelect>}
       </div>
       <p className="mt-2 text-[11px] text-[var(--muted)]">{estLabel}</p>
       {!confirm ? (

@@ -3,6 +3,7 @@ import json
 from app.brokers.base import BrokerAdapter
 from app.brokers.dhan import DhanAdapter
 from app.brokers.groww import GrowwAdapter
+from app.brokers.upstox import UpstoxAdapter
 from app.core.security import decrypt_data
 from app.models import BrokerConnection, BrokerType
 
@@ -17,5 +18,7 @@ def get_broker_adapter(connection: BrokerConnection) -> BrokerAdapter:
         )
     if connection.broker == BrokerType.GROWW:
         return GrowwAdapter(access_token=credentials.get("access_token", ""))
+    if connection.broker == BrokerType.UPSTOX:
+        return UpstoxAdapter(access_token=credentials.get("access_token", ""))
 
     raise ValueError(f"Unsupported broker: {connection.broker}")

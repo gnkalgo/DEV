@@ -29,6 +29,8 @@ export default function SettingsPage() {
   const [broker, setBroker] = useState("dhan");
   const [accessToken, setAccessToken] = useState("");
   const [clientId, setClientId] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [apiSecret, setApiSecret] = useState("");
   const [qr, setQr] = useState("");
   const [secret, setSecret] = useState("");
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
@@ -59,10 +61,11 @@ export default function SettingsPage() {
     setError("");
     await api("/api/v1/brokers/connect", {
       method: "POST",
-      body: JSON.stringify({ broker, access_token: accessToken, client_id: clientId || null }),
+      body: JSON.stringify({ broker, access_token: accessToken, client_id: clientId || null, api_key: apiKey || null, api_secret: apiSecret || null }),
     }, true);
     setMessage(`${broker} credentials saved (encrypted). Paper-trade before going live.`);
     setAccessToken("");
+    setApiSecret("");
     await load();
   }
 
@@ -195,9 +198,12 @@ export default function SettingsPage() {
           <select className="rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={broker} onChange={(e) => setBroker(e.target.value)}>
             <option value="dhan">Dhan</option>
             <option value="groww">Groww (optional)</option>
+            <option value="upstox">Upstox</option>
           </select>
           <input className="rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" placeholder="Client ID" value={clientId} onChange={(e) => setClientId(e.target.value)} />
+          {broker === "upstox" && <><input className="rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" placeholder="Upstox API key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} /><input className="rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" placeholder="Upstox API secret" value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} type="password" /></>}
           <input className="md:col-span-2 rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" placeholder="Access token / API key" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} type="password" />
+          {broker === "upstox" && <p className="md:col-span-2 text-xs text-slate-400">Create an app and authorize it at <a className="text-[#3aa0ff]" href="https://account.upstox.com/developer/apps" target="_blank" rel="noreferrer">Upstox Developer Apps</a>. Enter the OAuth access token here—never enter your Upstox password.</p>}
           <button className="rounded-xl bg-[#2ee6a6] px-4 py-2 font-semibold text-[#071018]">Save encrypted</button>
         </form>
         <ul className="mt-4 text-sm text-slate-400">

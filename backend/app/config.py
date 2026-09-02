@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     groww_api_base_url: str = "https://api.groww.in"
     groww_client_id: str = ""
     groww_client_secret: str = ""
+    upstox_api_base_url: str = "https://api.upstox.com"
+    upstox_order_base_url: str = "https://api-hft.upstox.com"
 
     ml_service_url: str = "http://localhost:8001"
     ml_service_token: str = ""

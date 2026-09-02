@@ -11,6 +11,7 @@ from app.database import Base
 class BrokerType(str, enum.Enum):
     DHAN = "dhan"
     GROWW = "groww"
+    UPSTOX = "upstox"
 
 
 class User(Base):

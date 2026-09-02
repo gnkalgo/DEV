@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     smtp_from: str = "noreply@gnkalgo.com"
     smtp_starttls: bool = True
     smtp_ssl: bool = False
+    email_verification_required: bool = False
 
     dhan_api_base_url: str = "https://api.dhan.co/v2"
     dhan_feed_ws_url: str = "wss://api-feed.dhan.co"
@@ -65,6 +66,26 @@ class Settings(BaseSettings):
     @property
     def origins_list(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    @property
+    def smtp_configured(self) -> bool:
+        """Return true only when SMTP has usable, non-placeholder settings.
+
+        Development commonly starts from ``.env.example``. Treating its sample
+        values as credentials blocks unverified logins without being able to
+        deliver the verification message.
+        """
+        required = (self.smtp_host, self.smtp_from)
+        if not all(value.strip() for value in required):
+            return False
+        if self.smtp_user and not self.smtp_password.strip():
+            return False
+        values = (self.smtp_host, self.smtp_user, self.smtp_password, self.smtp_from)
+        placeholders = ("replace-", "your-", "example", "changeme")
+        return not any(
+            value and any(marker in value.strip().lower() for marker in placeholders)
+            for value in values
+        )
 
 
 settings = Settings()

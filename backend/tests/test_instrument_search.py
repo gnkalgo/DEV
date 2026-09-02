@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.database import Base
 from app.services.instrument_csv_parser import parse_csv_row
 from app.services.instrument_service import instrument_service
-from app.services.instrument_sync_service import instrument_sync_service
+from app.services.instrument_sync_service import deduplicate_feed_rows, instrument_sync_service
 
 
 def test_parse_csv_equity_row():
@@ -91,3 +91,10 @@ def test_ingest_sample_csv():
         await engine.dispose()
 
     asyncio.run(_run())
+def test_curated_instrument_feed_keys_are_deduplicated_before_upsert():
+    rows = [
+        {"exchange": "NSE", "exchange_segment": "IDX_I", "security_id": "13", "symbol": "NIFTY50"},
+        {"exchange": "NSE", "exchange_segment": "IDX_I", "security_id": "13", "symbol": "NIFTY"},
+    ]
+    unique = deduplicate_feed_rows(rows)
+    assert [row["symbol"] for row in unique] == ["NIFTY50"]

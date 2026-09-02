@@ -5,6 +5,7 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test_gnkalgo.db"
 
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.main import app
 
 
@@ -67,6 +68,70 @@ def test_register_verify_login():
         assert "subscription" in msg or "market hours" in msg
 
 
+def test_login_allows_unverified_users_when_smtp_is_unconfigured():
+    original_host = settings.smtp_host
+    original_from = settings.smtp_from
+    settings.smtp_host = ""
+    settings.smtp_from = ""
+    try:
+        with TestClient(app) as client:
+            email = f"localdev-{uuid.uuid4().hex[:8]}@gnkalgo.com"
+            password = "SecurePass1!"
+            register = client.post(
+                "/api/v1/auth/register",
+                json={
+                    "email": email,
+                    "password": password,
+                    "full_name": "Local Dev User",
+                    "phone": f"96{uuid.uuid4().int % 10**8:08d}",
+                },
+            )
+            assert register.status_code == 201
+            login = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+            assert login.status_code == 200
+            assert login.json()["access_token"]
+    finally:
+        settings.smtp_host = original_host
+        settings.smtp_from = original_from
+
+
+def test_example_smtp_placeholders_do_not_block_development_login():
+    original = (
+        settings.app_env,
+        settings.smtp_host,
+        settings.smtp_user,
+        settings.smtp_password,
+        settings.smtp_from,
+    )
+    settings.app_env = "development"
+    settings.smtp_host = "mail.privateemail.com"
+    settings.smtp_user = "noreply@gnkalgo.com"
+    settings.smtp_password = "replace-with-mailbox-password"
+    settings.smtp_from = "noreply@gnkalgo.com"
+    try:
+        with TestClient(app) as client:
+            email = f"placeholder-{uuid.uuid4().hex[:8]}@example.com"
+            password = "StrongPass123!"
+            registered = client.post(
+                "/api/v1/auth/register",
+                json={"email": email, "password": password, "full_name": "Placeholder SMTP"},
+            )
+            assert registered.status_code == 201, registered.text
+            assert "SMTP is not configured" in registered.json()["message"]
+
+            login = client.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": password},
+            )
+            assert login.status_code == 200, login.text
+    finally:
+        (
+            settings.app_env,
+            settings.smtp_host,
+            settings.smtp_user,
+            settings.smtp_password,
+            settings.smtp_from,
+        ) = original
 def test_failed_logins_persist_and_lock_account():
     with TestClient(app) as client:
         email = f"lockout-{uuid.uuid4().hex[:8]}@gnkalgo.com"

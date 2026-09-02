@@ -19,6 +19,23 @@ logger = logging.getLogger(__name__)
 BATCH_SIZE = 500
 
 
+def deduplicate_feed_rows(rows: list[dict]) -> list[dict]:
+    """Keep the first canonical row for each broker feed identity."""
+    unique_rows: list[dict] = []
+    seen_feed_keys: set[tuple[str, str, str]] = set()
+    for row in rows:
+        feed_key = (
+            str(row.get("exchange", "")),
+            str(row.get("exchange_segment", "")),
+            str(row.get("security_id", "")),
+        )
+        if feed_key in seen_feed_keys:
+            continue
+        seen_feed_keys.add(feed_key)
+        unique_rows.append(row)
+    return unique_rows
+
+
 class InstrumentSyncService:
     async def count_instruments(self, db: AsyncSession) -> int:
         return await db.scalar(select(func.count()).select_from(Instrument)) or 0
@@ -143,6 +160,10 @@ class InstrumentSyncService:
     async def _upsert_batch(self, db: AsyncSession, rows: list[dict]) -> int:
         if not rows:
             return 0
+        # PostgreSQL rejects one ON CONFLICT statement when two input rows
+        # target the same unique key. This occurs in the curated data for
+        # aliases such as NIFTY/NIFTY50. Preserve the canonical first row.
+        rows = deduplicate_feed_rows(rows)
         # Core insert() does not apply ORM Python defaults — ensure primary keys exist.
         import uuid as _uuid
 

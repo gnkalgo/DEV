@@ -139,19 +139,10 @@ async def lifespan(app: FastAPI):
     from app.services.strategy_scheduler import start_strategy_scheduler
 
     log = logging.getLogger("uvicorn.error")
-    try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-            await conn.run_sync(_add_user_columns)
-            await conn.run_sync(_add_strategy_columns)
-            await conn.run_sync(_add_subscription_columns)
-            await conn.run_sync(_add_profile_columns)
-            await conn.run_sync(_add_mfa_columns)
-    except Exception:
-        log.exception(
-            "Database startup failed (check DATABASE_URL / POSTGRES_PASSWORD and that postgres is healthy)"
-        )
-        raise
+
+    if settings.app_env == "test":
+        yield
+        return
 
     try:
         await bootstrap_instruments()

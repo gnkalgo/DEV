@@ -8,7 +8,7 @@ from app.config import settings
 
 class EmailService:
     def enabled(self) -> bool:
-        return bool(settings.smtp_host and settings.smtp_from)
+        return settings.smtp_configured
 
     async def send(self, to_email: str, subject: str, text: str, html: str | None = None) -> None:
         if not self.enabled():

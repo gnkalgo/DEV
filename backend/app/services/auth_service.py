@@ -112,7 +112,10 @@ class AuthService:
         if not user.is_active:
             raise ValueError("Account is disabled")
 
-        if user.locked_until and user.locked_until > datetime.now(timezone.utc):
+        locked_until = user.locked_until
+        if locked_until and locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
+        if locked_until and locked_until > datetime.now(timezone.utc):
             raise ValueError("Account temporarily locked. Try again later.")
 
         if not verify_password(password, user.password_hash):
@@ -126,7 +129,10 @@ class AuthService:
         if password_needs_rehash(user.password_hash):
             user.password_hash = hash_password(password)
 
-        if not user.is_verified:
+        verification_required = (
+            settings.app_env == "production" or settings.email_verification_required
+        )
+        if not user.is_verified and verification_required:
             raise ValueError("Please verify your email before logging in")
 
         if user.mfa_enabled:

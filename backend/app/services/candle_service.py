@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.services.instrument_service import instrument_service
+from app.services.market_data_store import persist_candles
 from app.services.redis_cache import cache_get, cache_set
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -101,11 +102,18 @@ class CandleService:
 
         if adapter:
             try:
+                index_keys = {
+                    "NIFTY50": "NSE_INDEX|Nifty 50", "NIFTY": "NSE_INDEX|Nifty 50",
+                    "BANKNIFTY": "NSE_INDEX|Nifty Bank", "INDIAVIX": "NSE_INDEX|India VIX",
+                    "SENSEX": "BSE_INDEX|SENSEX",
+                }
+                segment_code = "INDEX" if inst.get("segment") == "INDEX" else "EQ"
+                instrument_key = index_keys.get(
+                    inst["symbol"],
+                    f"{inst.get('exchange', exchange)}_{segment_code}|{inst.get('isin') or inst['security_id']}",
+                )
                 candles = await adapter.get_historical_candles(
-                    security_id=inst["security_id"],
-                    exchange=inst.get("exchange", exchange),
-                    segment=inst.get("segment", "EQUITY"),
-                    interval=interval,
+                    instrument_key=instrument_key, interval=interval, count=count
                 )
             except Exception:
                 candles = []
@@ -114,7 +122,7 @@ class CandleService:
             candles = _generate_mock_candles(inst["symbol"], interval, count)
             source = "mock_dev"
         elif candles:
-            source = "dhan"
+            source = "upstox_v3"
         else:
             source = "empty"
 
@@ -138,6 +146,7 @@ class CandleService:
             "security_id": inst.get("security_id"),
         }
         if normalized:
+            await persist_candles(db, source, inst["symbol"], inst.get("exchange", exchange), interval, normalized)
             await cache_set(cache_key, result, settings.cache_candles_ttl_seconds)
         return result
 

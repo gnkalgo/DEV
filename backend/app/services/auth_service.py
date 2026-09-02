@@ -318,10 +318,18 @@ class BrokerService:
             adapter = GrowwAdapter(
                 access_token=credentials.get("access_token") or credentials.get("api_key") or "",
             )
-        else:
+        elif broker_enum == BrokerType.UPSTOX:
             from app.brokers.upstox import UpstoxAdapter
 
             adapter = UpstoxAdapter(access_token=credentials.get("access_token") or "")
+        else:
+            from app.market_data import FyersDataProvider
+
+            token = credentials.get("access_token") or ""
+            client_id = credentials.get("client_id") or credentials.get("api_key") or ""
+            if not token or not client_id:
+                raise ValueError("FYERS App ID and OAuth access token are required")
+            adapter = FyersDataProvider(token, client_id)
         try:
             await adapter.authenticate(credentials)
             health = "connected"

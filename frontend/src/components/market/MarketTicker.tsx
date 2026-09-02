@@ -57,7 +57,7 @@ export function MarketTicker() {
       <div className="flex h-[var(--ticker-height)] items-center gap-2 px-2">
         <div className={`flex shrink-0 items-center gap-1.5 px-2 text-[11px] font-medium ${statusColor}`}>
           <span className="h-1.5 w-1.5 rounded-full bg-current" />
-          <span>{status?.label ?? "Market"}<span className="ml-1 block text-[9px] opacity-75">{source.startsWith("dhan_live") ? "LIVE · Dhan" : "REFERENCE"}{updatedAt ? ` · ${new Date(updatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : ""}</span></span>
+          <span>{status?.label ?? "Market"}<span className="ml-1 block text-[9px] opacity-75">{source.includes("fyers_live") ? "LIVE · FYERS" : "REFERENCE · Yahoo/RapidAPI"}{updatedAt ? ` · ${new Date(updatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : ""}</span></span>
         </div>
         <div className="ticker-wrap relative flex-1 min-w-0">
           {loop.length ? (

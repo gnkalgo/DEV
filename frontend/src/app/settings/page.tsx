@@ -186,24 +186,27 @@ export default function SettingsPage() {
       </section>
 
       <section id="broker" className="mt-6 scroll-mt-8 rounded-2xl border border-[#1d3542] p-5">
-        <h2 className="font-medium">2. Connect Dhan (paper first)</h2>
+        <h2 className="font-medium">2. Configure execution and market-data accounts</h2>
         <p className="mt-2 text-sm text-slate-400">
-          From DhanHQ: API key / access token and client ID. Tokens are encrypted at rest.
+          Dhan is restricted to live execution and portfolio APIs; paid Dhan market data is not used. Tokens are encrypted at rest.
           Live Dhan orders need a <strong>static public IP</strong> whitelisted at Dhan (Oracle reserved IP).
         </p>
         <p className="mt-2 text-sm text-slate-400">
-          3. Optional Groww: needs a Groww Trading API subscription, then choose Groww below.
+          FYERS supplies the live-data fallback. Upstox V3 supplies historical candles for backtesting and ML collection. Yahoo and optional RapidAPI are configured on the server as reference-data fallbacks.
         </p>
         <form onSubmit={connect} className="mt-4 grid gap-3 md:grid-cols-2">
           <select className="rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={broker} onChange={(e) => setBroker(e.target.value)}>
             <option value="dhan">Dhan</option>
             <option value="groww">Groww (optional)</option>
             <option value="upstox">Upstox</option>
+            <option value="fyers">FYERS (live data)</option>
           </select>
           <input className="rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" placeholder="Client ID" value={clientId} onChange={(e) => setClientId(e.target.value)} />
           {broker === "upstox" && <><input className="rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" placeholder="Upstox API key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} /><input className="rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" placeholder="Upstox API secret" value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} type="password" /></>}
+          {broker === "fyers" && <input className="rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" placeholder="FYERS App ID / Client ID" value={clientId} onChange={(e) => setClientId(e.target.value)} />}
           <input className="md:col-span-2 rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" placeholder="Access token / API key" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} type="password" />
           {broker === "upstox" && <p className="md:col-span-2 text-xs text-slate-400">Create an app and authorize it at <a className="text-[#3aa0ff]" href="https://account.upstox.com/developer/apps" target="_blank" rel="noreferrer">Upstox Developer Apps</a>. Enter the OAuth access token here—never enter your Upstox password.</p>}
+          {broker === "fyers" && <p className="md:col-span-2 text-xs text-slate-400">Create a FYERS API V3 app with Quotes &amp; Market Data permission. Enter the OAuth access token—never your FYERS password.</p>}
           <button className="rounded-xl bg-[#2ee6a6] px-4 py-2 font-semibold text-[#071018]">Save encrypted</button>
         </form>
         <ul className="mt-4 text-sm text-slate-400">

@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.brokers.factory import get_broker_adapter
-from app.brokers.dhan import DhanAdapter
 from app.core.deps import get_current_user, user_from_access_token
 from app.core.security import decrypt_data
 from app.database import AsyncSessionLocal, get_db
@@ -17,6 +16,7 @@ from app.services.instrument_service import instrument_service
 from app.services.market_service import get_indices, market_session
 from app.services.market_ws_manager import subscribe_ws, unsubscribe_all, unsubscribe_ws
 from app.services.portfolio_service import portfolio_service
+from app.market_data import FyersDataProvider, RapidApiDataProvider, YahooFinanceProvider
 
 router = APIRouter(prefix="/market", tags=["Market"])
 
@@ -25,6 +25,37 @@ async def _dhan_credentials(db: AsyncSession, user: User) -> dict | None:
     conn = await portfolio_service._active_connection(db, user, "dhan")
     if not conn:
         return None
+
+
+async def _provider_credentials(db: AsyncSession, user: User, provider: str) -> dict | None:
+    conn = await portfolio_service._active_connection(db, user, provider)
+    if not conn:
+        return None
+    try:
+        creds = json.loads(decrypt_data(conn.encrypted_credentials))
+        if conn.client_id:
+            creds.setdefault("client_id", conn.client_id)
+        return creds
+    except Exception:
+        return None
+
+
+async def _reference_quote(symbol: str, exchange: str, fyers_creds: dict | None) -> dict | None:
+    providers = []
+    if fyers_creds:
+        providers.append(FyersDataProvider(
+            fyers_creds.get("access_token") or "",
+            fyers_creds.get("client_id") or fyers_creds.get("api_key") or "",
+        ))
+    providers.extend((YahooFinanceProvider(), RapidApiDataProvider()))
+    for provider in providers:
+        try:
+            quote = await provider.quote(symbol, exchange)
+            if quote:
+                return quote
+        except Exception:
+            continue
+    return None
     try:
         creds = json.loads(decrypt_data(conn.encrypted_credentials))
         if conn.client_id:
@@ -40,50 +71,24 @@ async def market_indices(
     db: AsyncSession = Depends(get_db),
 ):
     snapshot = get_indices()
-    credentials = await _dhan_credentials(db, current_user)
-    if not credentials:
-        return snapshot
-
-    # Dhan index security IDs from its instrument master. Fetch in one request
-    # to avoid rate-limit pressure from per-index polling.
-    security_ids = {
-        "NIFTY50": "13",
-        "BANKNIFTY": "25",
-        "NIFTYFINSERVICE": "27",
-        "NIFTYNEXT50": "38",
-        "NIFTYMIDCAP100": "442",
-        "INDIAVIX": "21",
-    }
-    try:
-        adapter = DhanAdapter(
-            access_token=credentials.get("access_token") or credentials.get("api_key") or "",
-            client_id=credentials.get("client_id"),
+    fyers_creds = await _provider_credentials(db, current_user, "fyers")
+    quotes = await asyncio.gather(*(
+        _reference_quote(item["symbol"], "NSE", fyers_creds) for item in snapshot["indices"]
+    ))
+    sources = set()
+    for item, quote in zip(snapshot["indices"], quotes):
+        if not quote or not quote.get("ltp"):
+            continue
+        item.update(
+            ltp=round(float(quote["ltp"]), 2),
+            change=round(float(quote.get("change", 0)), 2),
+            change_pct=round(float(quote.get("change_pct", 0)), 2),
+            is_live=quote.get("source") == "fyers_live",
         )
-        payload = await adapter.get_market_ohlc({"IDX_I": list(security_ids.values())})
-        quotes = payload.get("data", {}).get("IDX_I", {})
-        live_count = 0
-        for item in snapshot["indices"]:
-            quote = quotes.get(security_ids.get(item["symbol"], ""))
-            if not quote:
-                continue
-            ltp = float(quote.get("last_price", 0) or 0)
-            previous = float((quote.get("ohlc") or {}).get("close", 0) or 0)
-            if not ltp:
-                continue
-            change = ltp - previous if previous else 0.0
-            item.update(
-                ltp=round(ltp, 2),
-                change=round(change, 2),
-                change_pct=round(change / previous * 100, 2) if previous else 0.0,
-                is_live=True,
-            )
-            live_count += 1
-        if live_count:
-            snapshot["source"] = "dhan_live" if live_count == len(snapshot["indices"]) else "dhan_live_partial"
-            snapshot["updated_at"] = datetime.now(timezone.utc).isoformat()
-    except Exception:
-        # Keep the last/reference snapshot available, but never mislabel it live.
-        pass
+        sources.add(quote.get("source", "unknown"))
+    if sources:
+        snapshot["source"] = "+".join(sorted(sources))
+        snapshot["updated_at"] = datetime.now(timezone.utc).isoformat()
     return snapshot
 
 
@@ -125,7 +130,7 @@ async def market_candles(
     db: AsyncSession = Depends(get_db),
 ):
     adapter = None
-    conn = await portfolio_service._active_connection(db, current_user, "dhan")
+    conn = await portfolio_service._active_connection(db, current_user, "upstox")
     if conn:
         try:
             adapter = get_broker_adapter(conn)
@@ -161,25 +166,14 @@ async def market_quote(
         change_pct = float(cached.get("change_pct", 0))
         source = cached.get("source", "dhan_live")
 
-    conn = await portfolio_service._active_connection(db, current_user, "dhan")
-    if conn and ltp is None:
-        try:
-            adapter = get_broker_adapter(conn)
-            data = await adapter.get_market_quote_for_instrument(
-                inst["security_id"],
-                inst.get("exchange", exchange),
-                inst.get("segment", "EQUITY"),
-            )
-            if data:
-                ltp = float(data.get("last_price", 0) or 0)
-                ohlc = data.get("ohlc") or {}
-                prev = float(ohlc.get("close", 0) or 0)
-                if prev and ltp:
-                    change = round(ltp - prev, 2)
-                    change_pct = round((change / prev) * 100, 2)
-                source = "dhan"
-        except Exception:
-            pass
+    fyers_creds = await _provider_credentials(db, current_user, "fyers")
+    if ltp is None:
+        data = await _reference_quote(inst["symbol"], inst["exchange"], fyers_creds)
+        if data:
+            ltp = data["ltp"]
+            change = round(data.get("change", 0), 2)
+            change_pct = round(data.get("change_pct", 0), 2)
+            source = data.get("source", "reference")
 
     if ltp is None:
         from app.services.candle_service import BASE_PRICES
@@ -219,7 +213,9 @@ async def market_websocket(ws: WebSocket):
         try:
             user = await user_from_access_token(db, token)
             user_id = str(user.id)
-            dhan_creds = await _dhan_credentials(db, user)
+            # Dhan credentials are intentionally never passed to the data feed.
+            # Live snapshots use FYERS; chart history uses Upstox V3.
+            dhan_creds = None
             await db.commit()
         except Exception:
             await ws.close(code=4401)

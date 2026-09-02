@@ -1,4 +1,6 @@
 import httpx
+from datetime import datetime, timedelta
+from urllib.parse import quote
 
 from app.brokers.base import BrokerAdapter, OrderRequest, OrderResponse
 from app.config import settings
@@ -82,6 +84,39 @@ class UpstoxAdapter(BrokerAdapter):
 
     async def get_market_quote(self, symbols: list[str]) -> dict:
         return await self._request("GET", "/v2/market-quote/ltp", params={"instrument_key": ",".join(symbols)})
+
+    async def get_historical_candles(
+        self,
+        instrument_key: str,
+        interval: str,
+        count: int = 500,
+    ) -> list[dict]:
+        """Fetch OHLCV from Upstox Historical Candle Data V3."""
+        interval_map = {
+            "1m": ("minutes", 1), "3m": ("minutes", 3), "5m": ("minutes", 5),
+            "15m": ("minutes", 15), "30m": ("minutes", 30), "1H": ("hours", 1),
+            "4H": ("hours", 4), "1D": ("days", 1), "1W": ("weeks", 1),
+        }
+        unit, amount = interval_map.get(interval, ("minutes", 5))
+        to_date = datetime.now().date()
+        lookback_days = 3650 if unit in ("days", "weeks") else 30
+        from_date = to_date - timedelta(days=lookback_days)
+        path = (
+            f"/v3/historical-candle/{quote(instrument_key, safe='')}/{unit}/{amount}/"
+            f"{to_date.isoformat()}/{from_date.isoformat()}"
+        )
+        payload = await self._request("GET", path)
+        rows = payload.get("data", {}).get("candles", [])
+        candles = []
+        for row in rows[:count]:
+            ts = int(datetime.fromisoformat(str(row[0]).replace("Z", "+00:00")).timestamp())
+            candles.append({
+                "time": ts, "open": float(row[1]), "high": float(row[2]),
+                "low": float(row[3]), "close": float(row[4]),
+                "volume": int(row[5]) if row[5] is not None else None,
+                "open_interest": int(row[6]) if len(row) > 6 and row[6] is not None else None,
+            })
+        return candles
 
     async def health_check(self) -> bool:
         try:

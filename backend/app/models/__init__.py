@@ -1,4 +1,4 @@
-from app.models.instrument import Instrument, InstrumentSyncRun
+from app.models.instrument import Instrument, InstrumentSyncRun, MarketCandle
 from app.models.billing import Payment, Subscription
 from app.models.trading import (
     Order,
@@ -38,4 +38,5 @@ __all__ = [
     "Subscription",
     "Instrument",
     "InstrumentSyncRun",
+    "MarketCandle",
 ]

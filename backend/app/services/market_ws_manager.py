@@ -1,4 +1,4 @@
-"""Market WebSocket manager — Dhan live feed with dev mock fallback."""
+"""Legacy WebSocket transport; Dhan upstream is disabled (execution-only policy)."""
 
 import asyncio
 import json
@@ -270,7 +270,7 @@ async def subscribe_ws(
       json.dumps(
         {
           "type": "error",
-          "message": "Connect Dhan to access live market data.",
+          "message": "Live chart streaming requires the FYERS feed worker; REST quotes remain available.",
           "code": "BROKER_REQUIRED",
         }
       )

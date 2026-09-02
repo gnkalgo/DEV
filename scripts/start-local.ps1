@@ -40,7 +40,9 @@ Push-Location $projectRoot
 try {
     $legacyFrontend = & $dockerExe ps -aq --filter "name=^gnk_dev-frontend-1$"
     if ($legacyFrontend) {
-        $composeService = & $dockerExe inspect gnk_dev-frontend-1 --format '{{index .Config.Labels "com.docker.compose.service"}}' 2>$null
+        $labelsJson = & $dockerExe inspect gnk_dev-frontend-1 --format '{{json .Config.Labels}}' 2>$null
+        $labels = if ($labelsJson) { $labelsJson | ConvertFrom-Json } else { $null }
+        $composeService = if ($labels) { $labels.'com.docker.compose.service' } else { $null }
         if (-not $composeService) {
             Write-Host "Replacing legacy standalone frontend container..."
             & $dockerExe rm -f gnk_dev-frontend-1 | Out-Null
@@ -48,7 +50,7 @@ try {
     }
 
     $arguments = @("compose", "-p", "gnk_dev", "up", "-d")
-    if ($Rebuild) { $arguments += "--build" }
+    if ($Rebuild) { $arguments += @("--build", "--force-recreate") }
     & $dockerExe @arguments
     if ($LASTEXITCODE -ne 0) { throw "Docker Compose startup failed." }
 

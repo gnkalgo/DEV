@@ -1,6 +1,7 @@
 import enum
 import uuid
 from datetime import date, datetime
+from typing import Optional
 
 from sqlalchemy import Boolean, Date, DateTime, Index, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -32,14 +33,14 @@ class Instrument(Base):
     security_id: Mapped[str] = mapped_column(String(32), nullable=False)
     instrument_token: Mapped[str] = mapped_column(String(32), nullable=False)
     exchange_segment: Mapped[str] = mapped_column(String(16), nullable=False)
-    isin: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    expiry: Mapped[date | None] = mapped_column(Date, nullable=True)
-    strike: Mapped[float | None] = mapped_column(Numeric(14, 4), nullable=True)
-    option_type: Mapped[str | None] = mapped_column(String(4), nullable=True)
-    underlying_symbol: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    lot_size: Mapped[int | None] = mapped_column(nullable=True)
-    tick_size: Mapped[float | None] = mapped_column(Numeric(10, 4), nullable=True)
-    trading_symbol: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    isin: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    expiry: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    strike: Mapped[Optional[float]] = mapped_column(Numeric(14, 4), nullable=True)
+    option_type: Mapped[Optional[str]] = mapped_column(String(4), nullable=True)
+    underlying_symbol: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    lot_size: Mapped[Optional[int]] = mapped_column(nullable=True)
+    tick_size: Mapped[Optional[float]] = mapped_column(Numeric(10, 4), nullable=True)
+    trading_symbol: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     search_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -53,9 +54,9 @@ class InstrumentSyncRun(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default=InstrumentSyncStatus.RUNNING.value)
-    source_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    source_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     rows_upserted: Mapped[int] = mapped_column(default=0)
     rows_deactivated: Mapped[int] = mapped_column(default=0)
-    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -12,6 +12,9 @@ export function ProfileDetails({
   profile: Profile;
   onSave: (data: Record<string, unknown>) => Promise<void>;
 }) {
+  const displayDob = profile.date_of_birth
+    ? profile.date_of_birth.split("-").reverse().join("/")
+    : "—";
   const [editing, setEditing] = useState(false);
   const [fullName, setFullName] = useState(profile.full_name || "");
   const [displayName, setDisplayName] = useState(profile.display_name || "");
@@ -97,7 +100,7 @@ export function ProfileDetails({
           {editing ? (
             <TerminalInput type="date" value={dob} onChange={(e) => setDob(e.target.value)} className="mt-1 w-full" />
           ) : (
-            <dd className="mt-1 text-sm">{profile.date_of_birth || "—"}</dd>
+            <dd className="mt-1 text-sm">{displayDob}</dd>
           )}
         </div>
         <div>

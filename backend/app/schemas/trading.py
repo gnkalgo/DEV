@@ -33,6 +33,7 @@ class PlaceOrderRequest(BaseModel):
     broker: Literal["dhan", "groww", "paper"] = "paper"
     paper_mode: bool = True
     correlation_id: str | None = None
+    live_confirmation: str | None = Field(default=None, max_length=32)
 
 
 class OrderResponse(BaseModel):

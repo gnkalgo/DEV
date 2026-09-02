@@ -30,6 +30,7 @@ export function QuickOrderPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState(false);
+  const [liveConfirmation, setLiveConfirmation] = useState("");
 
   useEffect(() => {
     if (defaultSymbol) setSymbol(defaultSymbol);
@@ -52,6 +53,7 @@ export function QuickOrderPanel({
           price: price ? Number(price) : null,
           paper_mode: paperMode,
           broker: paperMode ? "paper" : "dhan",
+          live_confirmation: paperMode ? null : liveConfirmation,
         }),
       }, true);
       setConfirm(false);
@@ -129,13 +131,14 @@ export function QuickOrderPanel({
       ) : (
         <div className="mt-3 space-y-2">
           <p className="text-xs text-white">Confirm: {estLabel}</p>
+          {!paperMode && <TerminalInput value={liveConfirmation} onChange={(e) => setLiveConfirmation(e.target.value)} placeholder="Type CONFIRM LIVE ORDER" />}
           <div className="flex gap-2">
             <button type="button" onClick={() => setConfirm(false)} className="flex-1 rounded border border-[var(--line)] py-2 text-xs">
               Cancel
             </button>
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || (!paperMode && liveConfirmation !== "CONFIRM LIVE ORDER")}
               onClick={submit}
               className={`flex-1 rounded py-2 text-xs font-semibold disabled:opacity-50 ${
                 side === "BUY" ? "bg-[var(--profit)] text-black" : "bg-[var(--loss)] text-white"

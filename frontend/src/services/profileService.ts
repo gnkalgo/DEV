@@ -38,13 +38,13 @@ export async function updateProfile(data: Record<string, unknown>): Promise<Prof
 export async function uploadProfilePhoto(file: File): Promise<Profile> {
   const form = new FormData();
   form.append("file", file);
-  const token = typeof window !== "undefined" ? localStorage.getItem("gnk_access") : null;
   const base = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
     ? process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
     : "";
   const res = await fetch(`${base}/api/v1/profile/photo`, {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "include",
+    headers: { "X-CSRF-Token": document.cookie.split("; ").find((p) => p.startsWith("gnk_csrf="))?.split("=")[1] || "" },
     body: form,
   });
   const data = await res.json();

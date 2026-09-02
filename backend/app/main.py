@@ -2,7 +2,8 @@ from contextlib import asynccontextmanager
 
 import asyncio
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -189,6 +190,19 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+
+@app.middleware("http")
+async def csrf_protection(request: Request, call_next):
+    csrf_exempt = {"/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/forgot-password", "/api/v1/auth/reset-password", "/api/v1/auth/verify-email", "/v1/auth/login", "/v1/auth/register", "/v1/auth/forgot-password", "/v1/auth/reset-password", "/v1/auth/verify-email"}
+    if not request.headers.get("Authorization") and request.url.path not in csrf_exempt and request.method in {"POST", "PUT", "PATCH", "DELETE"} and (
+        request.cookies.get("gnk_access") or request.cookies.get("gnk_refresh")
+    ):
+        cookie_token = request.cookies.get("gnk_csrf")
+        header_token = request.headers.get("X-CSRF-Token")
+        if not cookie_token or not header_token or cookie_token != header_token:
+            return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+    return await call_next(request)
 
 app.add_middleware(
     CORSMiddleware,

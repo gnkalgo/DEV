@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     dhan_api_base_url: str = "https://api.dhan.co/v2"
     dhan_feed_ws_url: str = "wss://api-feed.dhan.co"
     dhan_static_ip: str = ""
+    cookie_secure: bool = False
 
     instrument_master_url: str = "https://images.dhan.co/api-data/api-scrip-master.csv"
     instrument_sync_enabled: bool = True

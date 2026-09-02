@@ -1,6 +1,6 @@
 "use client";
 
-import { api, getAccessToken } from "@/lib/api";
+import { api } from "@/lib/api";
 import { Logo } from "@/components/Logo";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -38,10 +38,6 @@ export default function SubscribePage() {
 
   async function buy(planCode: string) {
     setError("");
-    if (!getAccessToken()) {
-      router.push("/login?next=/subscribe");
-      return;
-    }
     setBusy(planCode);
     try {
       const checkout = await api<Checkout>("/api/v1/billing/checkout", {
@@ -51,7 +47,9 @@ export default function SubscribePage() {
       sessionStorage.setItem("gnk_checkout", JSON.stringify(checkout));
       router.push(`/subscribe/pay?id=${checkout.payment_id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Checkout failed");
+      const message = err instanceof Error ? err.message : "Checkout failed";
+      if (message.includes("Session expired") || message.includes("authenticated")) router.push("/login?next=/subscribe");
+      else setError(message);
     } finally {
       setBusy(null);
     }

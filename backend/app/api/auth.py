@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +37,20 @@ def _unconfigured_smtp_message(action: str, url: str) -> MessageResponse:
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+def _set_session_cookies(response: Response, access: str, refresh: str) -> None:
+    import secrets
+    secure = settings.cookie_secure or settings.app_env == "production"
+    common = {"secure": secure, "samesite": "strict", "path": "/"}
+    response.set_cookie("gnk_access", access, httponly=True, max_age=settings.jwt_access_token_expire_minutes * 60, **common)
+    response.set_cookie("gnk_refresh", refresh, httponly=True, max_age=settings.jwt_refresh_token_expire_days * 86400, **common)
+    response.set_cookie("gnk_csrf", secrets.token_urlsafe(32), httponly=False, max_age=settings.jwt_refresh_token_expire_days * 86400, **common)
+
+
+def _clear_session_cookies(response: Response) -> None:
+    for name in ("gnk_access", "gnk_refresh", "gnk_csrf"):
+        response.delete_cookie(name, path="/")
 
 
 @router.post("/register", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
@@ -95,7 +109,7 @@ async def verify_email(data: VerifyEmailRequest, request: Request, db: AsyncSess
 
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("20/minute")
-async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def login(data: LoginRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     try:
         access, refresh, _ = await auth_service.login(
             db, data.email, data.password, data.mfa_code, request
@@ -108,6 +122,7 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
         await db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
+    _set_session_cookies(response, access, refresh)
     return TokenResponse(
         access_token=access,
         refresh_token=refresh,
@@ -116,12 +131,16 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_tokens(data: RefreshRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def refresh_tokens(data: RefreshRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+    refresh_token = data.refresh_token or request.cookies.get("gnk_refresh")
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh session missing")
     try:
-        access, refresh = await auth_service.refresh_tokens(db, data.refresh_token, request)
+        access, refresh = await auth_service.refresh_tokens(db, refresh_token, request)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
+    _set_session_cookies(response, access, refresh)
     return TokenResponse(
         access_token=access,
         refresh_token=refresh,
@@ -165,11 +184,12 @@ async def get_me(current_user: User = Depends(get_current_user)):
 
 @router.get("/sessions", response_model=list[SessionResponse])
 async def list_sessions(
+    request: Request,
     refresh_token: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    sessions = await session_service.list_sessions(db, current_user, refresh_token)
+    sessions = await session_service.list_sessions(db, current_user, refresh_token or request.cookies.get("gnk_refresh"))
     return sessions
 
 
@@ -189,10 +209,14 @@ async def revoke_session(
 @router.post("/sessions/logout-others", response_model=MessageResponse)
 async def logout_other_sessions(
     data: LogoutOthersRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    count = await session_service.logout_others(db, current_user, data.refresh_token)
+    refresh_token = data.refresh_token or request.cookies.get("gnk_refresh")
+    if not refresh_token:
+        raise HTTPException(status_code=400, detail="Current session missing")
+    count = await session_service.logout_others(db, current_user, refresh_token)
     return MessageResponse(message=f"Logged out {count} other device(s).")
 
 
@@ -200,17 +224,20 @@ async def logout_other_sessions(
 async def logout(
     data: RefreshRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     from sqlalchemy import select
     from app.core.security import hash_token
     from app.models import UserSession
 
-    token_hash = hash_token(data.refresh_token)
+    refresh_token = data.refresh_token or request.cookies.get("gnk_refresh")
+    token_hash = hash_token(refresh_token) if refresh_token else ""
     result = await db.execute(select(UserSession).where(UserSession.refresh_token_hash == token_hash))
     session = result.scalar_one_or_none()
     if session:
         session.revoked = True
+    _clear_session_cookies(response)
     return MessageResponse(message="Logged out")
 
 

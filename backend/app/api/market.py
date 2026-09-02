@@ -158,7 +158,7 @@ async def market_websocket(ws: WebSocket):
     except Exception:
         await ws.close(code=4401)
         return
-    token = auth.get("token") if isinstance(auth, dict) else None
+    token = (auth.get("token") if isinstance(auth, dict) else None) or ws.cookies.get("gnk_access")
     if auth.get("action") != "auth" or not token:
         await ws.close(code=4401)
         return

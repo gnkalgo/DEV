@@ -9,7 +9,8 @@ from app.brokers.base import OrderRequest as BrokerOrderRequest
 from app.brokers.factory import get_broker_adapter
 from app.core.deps import log_audit
 from app.core.security import generate_secure_token
-from app.models import BrokerConnection, BrokerType, Order, User
+from app.models import BrokerConnection, BrokerType, Order, TradingControl, User
+from app.config import settings
 from app.schemas.trading import PlaceOrderRequest
 from app.services import billing_service
 from app.services.instrument_segments import dhan_exchange_segment
@@ -72,6 +73,13 @@ class OrderService:
             return await self._reject(db, user, data, exc.reason, strategy_id, webhook_id, source)
 
         if not paper:
+            control = await db.get(TradingControl, 1)
+            if not control or control.kill_switch_active:
+                return await self._reject(db, user, data, "Emergency kill switch is active", strategy_id, webhook_id, source)
+            if data.live_confirmation != "CONFIRM LIVE ORDER":
+                return await self._reject(db, user, data, "Type CONFIRM LIVE ORDER to authorize this live order", strategy_id, webhook_id, source)
+            if data.broker == "dhan" and not settings.dhan_static_ip.strip():
+                return await self._reject(db, user, data, "Dhan static public IP is not configured and allowlisting is unverified", strategy_id, webhook_id, source)
             sub = await billing_service.active_subscription(db, user)
             if not sub:
                 return await self._reject(

@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { api, setTokens, TokenBundle } from "@/lib/api";
+import { api } from "@/lib/api";
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 
@@ -12,6 +12,7 @@ function LoginForm() {
   const search = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [mfa, setMfa] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,11 +22,10 @@ function LoginForm() {
     setError("");
     setLoading(true);
     try {
-      const tokens = await api<TokenBundle>("/api/v1/auth/login", {
+      await api("/api/v1/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password, mfa_code: mfa || null }),
       });
-      setTokens(tokens);
       router.push(search.get("next") || "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -43,7 +43,10 @@ function LoginForm() {
         <label className="mt-6 block text-sm">Email</label>
         <input className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
         <label className="mt-4 block text-sm">Password</label>
-        <input className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
+        <div className="relative mt-1">
+          <input className="w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2 pr-14" value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? "text" : "password"} required />
+          <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 px-3 text-xs text-slate-400">{showPassword ? "Hide" : "Show"}</button>
+        </div>
         <label className="mt-4 block text-sm">MFA code (if enabled)</label>
         <input className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={mfa} onChange={(e) => setMfa(e.target.value)} placeholder="6-digit TOTP or backup code" />
         {error && <p className="mt-3 text-sm text-[#ff6b6b]">{error}</p>}

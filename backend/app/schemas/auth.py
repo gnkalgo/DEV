@@ -106,7 +106,7 @@ class MessageResponse(BaseModel):
 
 
 class BrokerConnectRequest(BaseModel):
-    broker: Literal["dhan", "groww", "upstox"]
+    broker: Literal["dhan", "groww", "upstox", "fyers"]
     api_key: str | None = None
     api_secret: str | None = None
     access_token: str | None = None

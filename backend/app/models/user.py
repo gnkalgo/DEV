@@ -12,6 +12,7 @@ class BrokerType(str, enum.Enum):
     DHAN = "dhan"
     GROWW = "groww"
     UPSTOX = "upstox"
+    FYERS = "fyers"
 
 
 class User(Base):

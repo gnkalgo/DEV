@@ -30,7 +30,7 @@ class PlaceOrderRequest(BaseModel):
     order_type: Literal["MARKET", "LIMIT"] = "MARKET"
     price: float | None = None
     product_type: str = "INTRADAY"
-    broker: Literal["dhan", "groww", "upstox", "paper"] = "paper"
+    broker: Literal["dhan", "paper"] = "paper"
     paper_mode: bool = True
     correlation_id: str | None = None
     live_confirmation: str | None = Field(default=None, max_length=32)

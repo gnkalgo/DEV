@@ -73,6 +73,8 @@ class OrderService:
             return await self._reject(db, user, data, exc.reason, strategy_id, webhook_id, source)
 
         if not paper:
+            if data.broker != "dhan":
+                return await self._reject(db, user, data, "Live execution is restricted to Dhan", strategy_id, webhook_id, source)
             control = await db.get(TradingControl, 1)
             if not control or control.kill_switch_active:
                 return await self._reject(db, user, data, "Emergency kill switch is active", strategy_id, webhook_id, source)
@@ -158,11 +160,7 @@ class OrderService:
                     correlation_id=order.correlation_id,
                     security_id=str(inst["security_id"]),
                     exchange_segment=exchange_segment,
-                    instrument_token=(
-                        f"{order.exchange}_EQ|{inst['isin']}"
-                        if data.broker == "upstox" and inst.get("isin")
-                        else inst.get("instrument_token")
-                    ),
+                    instrument_token=inst.get("instrument_token"),
                 )
             )
             order.broker_order_id = response.broker_order_id

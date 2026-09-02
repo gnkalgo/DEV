@@ -23,6 +23,8 @@ dist/
 agent-tools/
 
 artifacts/
+data/market/
+*.parquet
 certbot/
 
 !.env.example
@@ -42,4 +44,3 @@ build/
 
 postgres-data/
 redis-data/
-

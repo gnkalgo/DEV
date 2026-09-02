@@ -45,6 +45,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app
+      - market_data:/data/market
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   ml-service:
@@ -63,6 +64,7 @@ services:
         condition: service_healthy
     volumes:
       - ./ml-service:/app
+      - market_data:/data/market:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 
   frontend:
@@ -80,3 +82,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  market_data:

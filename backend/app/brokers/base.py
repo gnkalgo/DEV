@@ -27,7 +27,7 @@ class OrderResponse:
 
 
 class BrokerAdapter(ABC):
-    """Unified interface for Dhan and Groww broker APIs."""
+    """Unified execution/portfolio interface for supported broker APIs."""
 
     @abstractmethod
     async def authenticate(self, credentials: dict[str, Any]) -> bool:

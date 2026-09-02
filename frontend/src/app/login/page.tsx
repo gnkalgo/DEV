@@ -40,6 +40,7 @@ function LoginForm() {
         <Logo href="/" size={44} />
         <h1 className="mt-6 text-2xl font-semibold">Login</h1>
         <p className="mt-1 text-sm text-slate-400">GnKAlgo account</p>
+        {search.get("verified") === "1" && <p className="mt-3 rounded-lg border border-[#2ee6a6]/40 bg-[#2ee6a6]/10 p-3 text-sm text-[#2ee6a6]">Email verified successfully. You can now sign in.</p>}
         <label className="mt-6 block text-sm">Email</label>
         <input className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
         <label className="mt-4 block text-sm">Password</label>

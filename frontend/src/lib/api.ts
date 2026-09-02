@@ -17,6 +17,23 @@ function cookie(name: string): string | null {
   return item ? decodeURIComponent(item.slice(name.length + 1)) : null;
 }
 
+type ValidationIssue = { loc?: Array<string | number>; msg?: string };
+
+function errorDetail(data: unknown, fallback: string): string {
+  const detail = (data as { detail?: unknown })?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((issue: ValidationIssue) => {
+      const field = issue.loc?.filter((part) => part !== "body").at(-1);
+      const label = typeof field === "string"
+        ? field.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase())
+        : "Input";
+      return `${label}: ${issue.msg || "Invalid value"}`;
+    }).join(". ");
+  }
+  return fallback;
+}
+
 async function refreshAccessToken(): Promise<boolean> {
   const res = await fetch(`${resolveApiBase()}/api/v1/auth/refresh`, {
     method: "POST",
@@ -50,8 +67,7 @@ export async function api<T>(path: string, options: RequestInit = {}, auth = fal
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const detail = (data as { detail?: string }).detail || res.statusText;
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    throw new Error(errorDetail(data, res.statusText || "Request failed"));
   }
   return data as T;
 }

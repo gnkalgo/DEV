@@ -14,6 +14,14 @@ class RegisterRequest(BaseModel):
     gender: Literal["Male", "Female", "Other"] | None = None
     date_of_birth: date | None = None
 
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 2:
+            raise ValueError("Full name must be at least 2 characters")
+        return value
+
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:

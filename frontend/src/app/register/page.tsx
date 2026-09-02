@@ -21,11 +21,15 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
     setMessage("");
+    if (fullName.trim().length < 2) {
+      setError("Full name must be at least 2 characters.");
+      return;
+    }
     setLoading(true);
     try {
         const res = await api<{ message: string }>("/api/v1/auth/register", {
         method: "POST",
-        body: JSON.stringify({ full_name: fullName, email, phone: phone || null, password, gender: gender || null, date_of_birth: dateOfBirth || null }),
+        body: JSON.stringify({ full_name: fullName.trim(), email, phone: phone || null, password, gender: gender || null, date_of_birth: dateOfBirth || null }),
       });
       setMessage(res.message);
     } catch (err) {
@@ -56,7 +60,7 @@ export default function RegisterPage() {
         <h1 className="mt-6 text-2xl font-semibold">Create account</h1>
         <p className="mt-1 text-sm text-slate-400">Password: 12+ chars, upper, lower, digit, special.</p>
         <label className="mt-6 block text-sm">Full name</label>
-        <input className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+        <input className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={fullName} onChange={(e) => setFullName(e.target.value)} minLength={2} required />
         <label className="mt-4 block text-sm">Email</label>
         <input className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
         <label className="mt-4 block text-sm">Phone (India)</label>

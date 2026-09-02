@@ -9,65 +9,37 @@ function resolveApiBase(): string {
   return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 }
 
-export type TokenBundle = {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-  expires_in: number;
-};
+export function clearTokens() { /* The server clears authentication cookies. */ }
 
-const ACCESS_KEY = "gnk_access";
-const REFRESH_KEY = "gnk_refresh";
-
-export function getAccessToken() {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(ACCESS_KEY);
-}
-
-export function getRefreshToken() {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(REFRESH_KEY);
-}
-
-export function setTokens(tokens: TokenBundle) {
-  localStorage.setItem(ACCESS_KEY, tokens.access_token);
-  localStorage.setItem(REFRESH_KEY, tokens.refresh_token);
-}
-
-export function clearTokens() {
-  localStorage.removeItem(ACCESS_KEY);
-  localStorage.removeItem(REFRESH_KEY);
+function cookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const item = document.cookie.split("; ").find((part) => part.startsWith(`${name}=`));
+  return item ? decodeURIComponent(item.slice(name.length + 1)) : null;
 }
 
 async function refreshAccessToken(): Promise<boolean> {
-  const refresh = getRefreshToken();
-  if (!refresh) return false;
   const res = await fetch(`${resolveApiBase()}/api/v1/auth/refresh`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refresh }),
+    credentials: "include",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": cookie("gnk_csrf") || "" },
+    body: JSON.stringify({}),
   });
   if (!res.ok) return false;
-  const tokens = (await res.json()) as TokenBundle;
-  setTokens(tokens);
   return true;
 }
 
 export async function api<T>(path: string, options: RequestInit = {}, auth = false): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
-  if (auth) {
-    const token = getAccessToken();
-    if (token) headers.set("Authorization", `Bearer ${token}`);
-  }
-  let res = await fetch(`${resolveApiBase()}${path}`, { ...options, headers });
+  if (auth && options.method && !["GET", "HEAD"].includes(options.method.toUpperCase())) headers.set("X-CSRF-Token", cookie("gnk_csrf") || "");
+  let res = await fetch(`${resolveApiBase()}${path}`, { ...options, headers, credentials: "include" });
   if (auth && res.status === 401) {
     const ok = await refreshAccessToken();
     if (ok) {
       const retryHeaders = new Headers(options.headers);
       retryHeaders.set("Content-Type", "application/json");
-      retryHeaders.set("Authorization", `Bearer ${getAccessToken()}`);
-      res = await fetch(`${resolveApiBase()}${path}`, { ...options, headers: retryHeaders });
+      if (options.method && !["GET", "HEAD"].includes(options.method.toUpperCase())) retryHeaders.set("X-CSRF-Token", cookie("gnk_csrf") || "");
+      res = await fetch(`${resolveApiBase()}${path}`, { ...options, headers: retryHeaders, credentials: "include" });
     } else {
       clearTokens();
       if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {

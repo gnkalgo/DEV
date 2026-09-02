@@ -1,17 +1,24 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from app.core.deps import get_current_user
 from app.database import get_db
-from app.models import Payment, Subscription, User
+from app.models import Payment, Subscription, TradingControl, User
+from app.core.deps import log_audit
 from app.services import billing_service
 from app.services.instrument_sync_service import instrument_sync_service
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+
+class KillSwitchUpdate(BaseModel):
+    active: bool
+    reason: str | None = None
 
 
 async def require_admin(
@@ -20,6 +27,25 @@ async def require_admin(
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin only")
     return current_user
+
+
+@router.get("/trading/kill-switch")
+async def get_kill_switch(_: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    control = await db.get(TradingControl, 1)
+    return {"active": True if control is None else control.kill_switch_active, "reason": control.reason if control else "Safe default"}
+
+
+@router.put("/trading/kill-switch")
+async def set_kill_switch(data: KillSwitchUpdate, request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    control = await db.get(TradingControl, 1)
+    if not control:
+        control = TradingControl(id=1)
+        db.add(control)
+    control.kill_switch_active = data.active
+    control.reason = data.reason
+    control.updated_by = admin.id
+    await log_audit(db, "trading.kill_switch_changed", admin.id, request, {"active": data.active, "reason": data.reason})
+    return {"active": control.kill_switch_active, "reason": control.reason}
 
 
 @router.get("/stats")

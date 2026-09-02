@@ -57,7 +57,7 @@ class SessionResponse(BaseModel):
 
 
 class LogoutOthersRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None
 
 
 class NewsItemResponse(BaseModel):
@@ -71,4 +71,3 @@ class NewsItemResponse(BaseModel):
     symbol: str | None = None
     thumbnail: str | None = None
     is_mock: bool = False
-

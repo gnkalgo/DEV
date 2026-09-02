@@ -51,6 +51,8 @@ class AuthService:
             phone=data.phone,
             full_name=data.full_name,
             password_hash=hash_password(data.password),
+            gender=data.gender,
+            date_of_birth=data.date_of_birth,
         )
         db.add(user)
         await db.flush()

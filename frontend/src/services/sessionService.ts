@@ -1,4 +1,4 @@
-import { api, getRefreshToken } from "@/lib/api";
+import { api } from "@/lib/api";
 
 export type DeviceSession = {
   id: string;
@@ -14,9 +14,7 @@ export type DeviceSession = {
 };
 
 export async function fetchSessions(): Promise<DeviceSession[]> {
-  const refresh = getRefreshToken();
-  const q = refresh ? `?refresh_token=${encodeURIComponent(refresh)}` : "";
-  return api<DeviceSession[]>(`/api/v1/auth/sessions${q}`, {}, true);
+  return api<DeviceSession[]>("/api/v1/auth/sessions", {}, true);
 }
 
 export async function logoutSession(sessionId: string): Promise<void> {
@@ -24,11 +22,9 @@ export async function logoutSession(sessionId: string): Promise<void> {
 }
 
 export async function logoutOtherDevices(): Promise<string> {
-  const refresh = getRefreshToken();
-  if (!refresh) throw new Error("No session token");
   const res = await api<{ message: string }>("/api/v1/auth/sessions/logout-others", {
     method: "POST",
-    body: JSON.stringify({ refresh_token: refresh }),
+    body: JSON.stringify({}),
   }, true);
   return res.message;
 }

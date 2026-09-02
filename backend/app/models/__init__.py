@@ -5,6 +5,7 @@ from app.models.trading import (
     Signal,
     Strategy,
     StrategyRun,
+    TradingControl,
     Webhook,
     WebhookLog,
 )
@@ -29,6 +30,7 @@ __all__ = [
     "Order",
     "Strategy",
     "StrategyRun",
+    "TradingControl",
     "Signal",
     "Webhook",
     "WebhookLog",

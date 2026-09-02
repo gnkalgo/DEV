@@ -44,6 +44,7 @@ export default function AdminPage() {
   const [note, setNote] = useState("");
   const [meEmail, setMeEmail] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [killSwitch, setKillSwitch] = useState<{ active: boolean; reason: string | null } | null>(null);
 
   async function load() {
     setError("");
@@ -55,14 +56,16 @@ export default function AdminPage() {
         setError("Admin only — your account is not an admin yet.");
         return;
       }
-      const [s, u, p] = await Promise.all([
+      const [s, u, p, k] = await Promise.all([
         api<Stats>("/api/v1/admin/stats", {}, true),
         api<UserRow[]>("/api/v1/admin/users", {}, true),
         api<PaymentRow[]>("/api/v1/admin/payments", {}, true),
+        api<{ active: boolean; reason: string | null }>("/api/v1/admin/trading/kill-switch", {}, true),
       ]);
       setStats(s);
       setUsers(u);
       setPayments(p);
+      setKillSwitch(k);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Admin access denied");
     }
@@ -81,6 +84,17 @@ export default function AdminPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Confirm failed");
     }
+  }
+
+  async function toggleKillSwitch() {
+    if (!killSwitch) return;
+    const active = !killSwitch.active;
+    if (!active && !window.confirm("Disable the emergency stop and permit eligible LIVE orders?")) return;
+    const updated = await api<{ active: boolean; reason: string | null }>("/api/v1/admin/trading/kill-switch", {
+      method: "PUT",
+      body: JSON.stringify({ active, reason: active ? "Activated by administrator" : "Explicitly disabled by administrator" }),
+    }, true);
+    setKillSwitch(updated);
   }
 
   return (
@@ -114,6 +128,8 @@ export default function AdminPage() {
         </div>
       )}
       {note && <p className="mt-3 text-[#2ee6a6]">{note}</p>}
+
+      {killSwitch && <section className="mt-6 rounded-2xl border border-[#ff6b6b]/50 p-5"><h2 className="font-semibold">Emergency kill switch: {killSwitch.active ? "ACTIVE" : "DISABLED"}</h2><p className="mt-1 text-sm text-slate-400">{killSwitch.reason}</p><button type="button" onClick={toggleKillSwitch} className="mt-3 rounded-lg border border-[#ff6b6b] px-3 py-2 text-sm">{killSwitch.active ? "Disable with confirmation" : "Activate emergency stop"}</button></section>}
 
       {stats && (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

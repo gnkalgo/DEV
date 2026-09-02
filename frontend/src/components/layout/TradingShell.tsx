@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { MobileNavigation } from "@/components/layout/MobileNavigation";
 import { TradingHeader } from "@/components/layout/TradingHeader";
 import { TradingSidebar } from "@/components/layout/TradingSidebar";
-import { api, getAccessToken } from "@/lib/api";
+import { api } from "@/lib/api";
 
 export function TradingShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -14,13 +14,12 @@ export function TradingShell({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    if (!getAccessToken()) {
-      router.replace("/login?next=" + encodeURIComponent(pathname));
-      return;
-    }
     api<{ is_admin?: boolean }>("/api/v1/auth/me", {}, true)
       .then((me) => setIsAdmin(Boolean(me.is_admin)))
-      .catch(() => setIsAdmin(false));
+      .catch(() => {
+        setIsAdmin(false);
+        router.replace("/login?next=" + encodeURIComponent(pathname));
+      });
   }, [router, pathname]);
 
   return (

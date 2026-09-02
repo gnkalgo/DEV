@@ -56,9 +56,10 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    if not credentials:
+    token = credentials.credentials if credentials else request.cookies.get("gnk_access")
+    if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    return await user_from_access_token(db, credentials.credentials)
+    return await user_from_access_token(db, token)
 
 
 async def log_audit(

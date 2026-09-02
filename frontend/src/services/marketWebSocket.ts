@@ -1,5 +1,3 @@
-import { getAccessToken } from "@/lib/api";
-
 type TickHandler = (tick: { symbol: string; ltp: number; time: number }) => void;
 type StatusHandler = (status: string) => void;
 
@@ -44,11 +42,6 @@ class MarketWebSocket {
   }
 
   connect() {
-    const token = getAccessToken();
-    if (!token) {
-      this.setStatus("DISCONNECTED");
-      return;
-    }
     this.intentionalClose = false;
     this.setStatus("CONNECTING");
     const url = `${wsBase()}/api/v1/market/ws`;
@@ -57,10 +50,7 @@ class MarketWebSocket {
     this.ws.onopen = () => {
       this.reconnectDelay = 1000;
       this.setStatus("CONNECTED");
-      const token = getAccessToken();
-      if (token) {
-        this.send({ action: "auth", token });
-      }
+      this.send({ action: "auth" });
       if (this.subscribed) {
         this.sendSubscribe(this.subscribed.symbol, this.subscribed.exchange);
       }

@@ -10,6 +10,9 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [gender, setGender] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,7 +25,7 @@ export default function RegisterPage() {
     try {
         const res = await api<{ message: string }>("/api/v1/auth/register", {
         method: "POST",
-        body: JSON.stringify({ full_name: fullName, email, phone: phone || null, password }),
+        body: JSON.stringify({ full_name: fullName, email, phone: phone || null, password, gender: gender || null, date_of_birth: dateOfBirth || null }),
       });
       setMessage(res.message);
     } catch (err) {
@@ -59,7 +62,11 @@ export default function RegisterPage() {
         <label className="mt-4 block text-sm">Phone (India)</label>
         <input className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={phone} onChange={(e) => setPhone(e.target.value)} />
         <label className="mt-4 block text-sm">Password</label>
-        <input className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
+        <div className="relative mt-1"><input className="w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2 pr-14" value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? "text" : "password"} required /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute inset-y-0 right-0 px-3 text-xs text-slate-400">{showPassword ? "Hide" : "Show"}</button></div>
+        <label className="mt-4 block text-sm">Date of birth (DD/MM/YYYY)</label>
+        <input className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} type="date" required />
+        <label className="mt-4 block text-sm">Gender</label>
+        <select className="mt-1 w-full rounded-lg border border-[#1d3542] bg-[#071018] px-3 py-2" value={gender} onChange={(e) => setGender(e.target.value)} required><option value="">Select gender</option><option>Male</option><option>Female</option><option>Other</option></select>
         {error && <p className="mt-3 text-sm text-[#ff6b6b]">{error}</p>}
         {message && <p className="mt-3 text-sm text-[#2ee6a6] break-all">{message}</p>}
         <button disabled={loading} className="mt-6 w-full rounded-xl bg-[#2ee6a6] py-2.5 font-semibold text-[#071018]">

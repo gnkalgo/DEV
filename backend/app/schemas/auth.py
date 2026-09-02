@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -11,6 +11,8 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=12, max_length=128)
     full_name: str = Field(min_length=2, max_length=100)
     phone: str | None = Field(default=None, max_length=15)
+    gender: Literal["Male", "Female", "Other"] | None = None
+    date_of_birth: date | None = None
 
     @field_validator("password")
     @classmethod
@@ -47,7 +49,7 @@ class TokenResponse(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None
 
 
 class ForgotPasswordRequest(BaseModel):
